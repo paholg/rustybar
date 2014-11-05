@@ -19,7 +19,7 @@ mod cpubar;
 
 fn main() {
     let mut cpu_cmap = box ColorMap::new();
-    cpu_cmap.add_pair(0,   Color::new(1., 1., 1.));
+    cpu_cmap.add_pair(0,   Color::new(0., 0., 0.));
     cpu_cmap.add_pair(10,  Color::new(0.3, 0.3, 0.3));
     cpu_cmap.add_pair(30,  Color::new(0.7, 0.8, 0.25));
     cpu_cmap.add_pair(60,  Color::new(0.8, 0.6, 0.0));
