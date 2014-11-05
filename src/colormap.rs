@@ -16,8 +16,8 @@ impl Color {
         assert!((blue >= 0.0) && (blue <= 1.0), "Tried to set a blue color value to {} (needs to be in [0,1])", blue);
         Color{r: (red*255.) as u8, g: (green*255.) as u8, b: (blue*255.) as u8}
     }
-    // pub fn newu(red: u8, green: u8, blue: u8) -> Color {
-    //     Color{r: red, g: green, b: blue}
+    // pub fn newu<'a>(red: &'a u8, green: &'a u8, blue: &'a u8) -> &'a Color {
+    //     &Color{r: *red, g: *green, b: *blue}
     // }
 }
 
