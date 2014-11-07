@@ -2,16 +2,14 @@ extern crate time;
 
 use std::fmt;
 //use regex::Regex;
-use statusbar::{StatusBar, FormatBar};
+use statusbar::*;
 use colormap::ColorMap;
 use std::io::{File};
 use std::io::fs::PathExtensions;
 
 use self::time::{Timespec, get_time};
 
-static BGCOLOR: &'static str = "#000000";
 static TEXTCOLOR: &'static str = "#888888";
-
 
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 pub struct CpuBar {
@@ -64,7 +62,6 @@ impl StatusBar for CpuBar {
             panic!("The file {} does not exist. You cannot use the cpu bar without it. Are you sure you're running GNU/Linux?", info_path.display());
         }
         let cpu_info = File::open(&info_path).read_to_string().unwrap();
-
         // want to first get number of cores and processors
         let re_core = regex!(r"(?s)cpu\scores\s:\s(\d+).*?siblings\s:\s(\d+)");
         let cap = re_core.captures_iter(cpu_info.as_slice()).nth(0).unwrap();
@@ -95,15 +92,15 @@ impl StatusBar for CpuBar {
         for cap in re.captures_iter(info.as_slice()) {
             let proc_id: uint = from_str(cap.at(1)).unwrap();
             let idle: uint = from_str(cap.at(3)).unwrap();
-            self.idles[self.proc_map[proc_id]] = idle;
+            self.idles[self.proc_map[proc_id]] = idle; //fixme: hack to make this always return a low enough value the first time
         }
-        self.last = get_time();
         // set length
         self.str_length = (self.width + self.space)*self.procs_per_core*self.num_cores +
             (self.space + 2)*(self.num_cores + 1) - self.space;
         // now we've finished the initialization, we'll run update to make sure everything is set
         self.update();
     }
+
     fn update(&mut self) {
         let path = Path::new("/proc/stat");
         if !path.is_file() {
@@ -127,7 +124,7 @@ impl StatusBar for CpuBar {
         vals.grow(self.idles.len(), 0);
         self.bar.clear();
 
-        self.bar.push_str(format!("^bg({})^fg({})^r(2x{})^r({}x0)", BGCOLOR, TEXTCOLOR,
+        self.bar.push_str(format!("^fg({})^r(2x{})^r({}x0)", TEXTCOLOR,
                                   2*self.height, self.space).as_slice());
 
         for i in range(0u, self.idles.len()) {
@@ -145,9 +142,11 @@ impl StatusBar for CpuBar {
         }
         self.idles = new_idles;
     }
+
     fn set_colormap(&mut self, cmap: Box<ColorMap>) {
         self.cmap = *cmap;
     }
+
     fn len(&self) -> uint {
         self.str_length
     }
