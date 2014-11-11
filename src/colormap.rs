@@ -10,7 +10,7 @@ pub struct Color {
 
 impl Color {
     /// creates a Color object, guaranteeing that the colors are acceptable values.
-    pub fn new(red: f64, green: f64, blue: f64) -> Color {
+    pub fn new(red: f32, green: f32, blue: f32) -> Color {
         assert!((red >= 0.0) && (red <= 1.0), "Tried to set a red color value to {} (needs to be in [0,1])", red);
         assert!((green >= 0.0) && (green <= 1.0), "Tried to set a green color value to {} (needs to be in [0,1])", green);
         assert!((blue >= 0.0) && (blue <= 1.0), "Tried to set a blue color value to {} (needs to be in [0,1])", blue);
@@ -93,3 +93,12 @@ impl ColorMap {
     // fixme: add show?
     // fixme: we should have a way to to remove elements
 }
+// impl Clone for ColorMap {
+//     fn clone(&self) -> ColorMap {
+//         let c: Vec<Color> = Vec::new();
+//         //c.push_all(self.colors.clone());
+//         let v: Vec<u8> = Vec::new();
+//         self.values.clone() + 3;
+//         ColorMap{colors: c, values: v}
+//     }
+// }

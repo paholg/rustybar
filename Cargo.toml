@@ -7,5 +7,11 @@ authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 [dependencies.inotify]
 git = "https://github.com/hannobraun/inotify-rs"
 
-# [dependencies.rust-ini]
-# git = "https://github.com/zonyitoo/rust-ini"
+[dependencies.xlib]
+git = "https://github.com/servo/rust-xlib"
+
+# [dependencies.glob]
+# git = "https://github.com/rust-lang/glob.git"
+
+[dependencies.toml]
+git = "https://github.com/alexcrichton/toml-rs"

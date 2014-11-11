@@ -1,10 +1,13 @@
-use std::fmt;
+//extern crate libc;
+
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::{BufferedReader, File};
+use std::io::File;
 use std::io::fs::PathExtensions;
+use std::io::timer;
+use std::time::Duration;
+use std::io::pipe;
 
-static BGCOLOR: &'static str = "#000000";
 
 /// A statusbar for battery information. All data is gathered from '/sys/class/power_supply/BAT#/'
 pub struct BatteryBar {
@@ -12,13 +15,11 @@ pub struct BatteryBar {
     path_capacity: Path,
     path_status: Path,
     cmap: ColorMap,
-    // the length, in pixels, of the displayed string.
-    str_length: uint,
-    bar: String,
     // the size of bars and spaces between them
-    width: uint,
-    space: uint,
-    height: uint,
+    char_width: uint,
+    pub width: uint,
+    pub space: uint,
+    pub height: uint,
 }
 
 impl BatteryBar {
@@ -28,11 +29,10 @@ impl BatteryBar {
             path_capacity: Path::new("/"),
             path_status: Path::new("/"),
             cmap: ColorMap::new(),
-            str_length: 0,
-            bar: String::new(),
-            width: 0,
-            space: 0,
-            height: 0,
+            char_width: 0,
+            width: 30,
+            space: 8,
+            height: 10,
         }
     }
     /// sets the battery number to use
@@ -54,43 +54,37 @@ impl BatteryBar {
 }
 
 impl StatusBar for BatteryBar {
-    fn initialize(&mut self, width: uint, space: uint, height: uint) {
-        self.width = width;
-        self.space = space;
-        self.height = height;
-        // In case this hasn't been run. It doesn't hurt to run it twice.
+    fn initialize(&mut self, char_width: uint) {
+        self.char_width = char_width;
+        // In case set_bat_num() hasn't been run. It doesn't hurt to run it twice.
         let num = self.bat_num;
         self.set_bat_num(num);
-        // and run update() to finish up
-        self.update();
     }
-    fn update(&mut self) {
-        let cap_string = File::open(&self.path_capacity).read_to_string().unwrap();
-        let capacity: u8 = from_str(cap_string.trim().as_slice()).unwrap();
-        let status_string = File::open(&self.path_status).read_to_string().unwrap();
-        let status = match status_string.trim().as_slice() {
-            "Charging" => "^fg(#00ff00) +",
-            "Discharging" => "^fg(#ff0000) -",
-            "Full" => "  ",
-            _ => " ^bg(#ff0000)^fg(000000)*^bg()",
-        };
-        //println!("{}", status_string);
-        self.bar.clear();
-        self.bar.push_str(format!("^fg({})", self.cmap.map(capacity)).as_slice());
-        // fixme: change when add_bar takes uints
-        self.bar.add_bar((capacity as f64)/100., self.width, self.height);
-        self.bar.push_str(status);
+    fn run(&self, mut stream: Box<pipe::PipeStream>) {
+        loop {
+            let cap_string = File::open(&self.path_capacity).read_to_string().unwrap();
+            let capacity: u8 = from_str(cap_string.trim().as_slice()).unwrap();
+
+            write_one_bar(&mut *stream, (capacity as f32)/100., self.cmap.map(capacity), self.width, self.height);
+            write_space(&mut *stream, self.space);
+            let status_string = File::open(&self.path_status).read_to_string().unwrap();
+            let status = match status_string.trim().as_slice() {
+                "Charging" => "^fg(#00ff00)+\n",
+                "Discharging" => "^fg(#ff0000)-\n",
+                "Full" => " \n",
+                _ => "^bg(#ff0000)^fg(#000000)*^bg()\n",
+            };
+            match stream.write_str(status) {
+                Err(msg) => println!("Trouble writing to battery bar: {}", msg),
+                Ok(_) => (),
+            }
+            timer::sleep(Duration::seconds(1));
+        }
     }
     fn set_colormap(&mut self, cmap: Box<ColorMap>) {
         self.cmap = *cmap;
     }
     fn len(&self) -> uint {
-        0
-    }
-}
-
-impl fmt::Show for BatteryBar {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.bar)
+        self.width + self.space + self.char_width
     }
 }
