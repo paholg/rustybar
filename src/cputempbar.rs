@@ -8,8 +8,6 @@ use std::io::{timer, pipe, Command};
 use std::string::String;
 use std::time::Duration;
 
-use self::time::{Timespec, get_time};
-
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 pub struct CpuTempBar {
     cmap: ColorMap,

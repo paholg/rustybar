@@ -39,7 +39,10 @@ impl StatusBar for StdinBar {
         loop {
             write_space(&mut *stream, self.lspace);
             let line = stdin.read_line();
-            stream.write_str(line.unwrap().as_slice());
+            match stream.write_str(line.unwrap().as_slice()) {
+                Err(msg) => println!("Trouble writing to stdin bar: {}", msg),
+                Ok(_) => (),
+            };
         }
     }
 

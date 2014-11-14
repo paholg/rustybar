@@ -16,10 +16,8 @@ extern crate collections;
 extern crate toml;
 extern crate getopts;
 
-use std::io;
 use std::io::{Command, File, process, pipe, fs, FilePermission};
 use std::io::fs::PathExtensions;
-use std::os::env;
 use getopts::{optopt,optflag,getopts,OptGroup};
 use std::os;
 
@@ -86,7 +84,10 @@ fn main() {
             };
             let bardir = home.join(".config/rustybar/");
             if bardir.exists() == false {
-                fs::mkdir_recursive(&bardir, FilePermission::from_bits(448).unwrap());
+                match fs::mkdir_recursive(&bardir, FilePermission::from_bits(448).unwrap()) {
+                    Ok(_) => (),
+                    Err(msg) => panic!(msg),
+                };
             }
             bardir
         },
@@ -96,7 +97,10 @@ fn main() {
     if config_path.is_file() == false {
         println!("You do not have an existing config file. Creating and populating:\n{}", config_path.display());
         let mut file = File::create(&config_path);
-        file.write(default_config());
+        match file.write(default_config()) {
+            Ok(_) => (),
+            Err(msg) => panic!("Couldn't write to config file: {}", msg),
+        };
     }
     // -- load config file -------------------------------------------
     assert!(config_path.is_file(), "config path bad!!");
