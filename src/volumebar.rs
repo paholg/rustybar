@@ -63,7 +63,6 @@ impl StatusBar for VolumeBar {
                 Ok(out) => out,
                 Err(msg) => panic!("Failed to run amixer with message: {}", msg),
             };
-            // println!("stat: {}", info.status);
             if info.status.success() == false {
                 println!("amixer returned exit signal {}.", info.status);
                 println!("error: {}", String::from_utf8(info.error).unwrap());

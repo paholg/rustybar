@@ -1,0 +1,4 @@
+- Font :: get width in pixels of characters
+- Errors :: Do real error handling instead of just panicking everywhere
+- Logging :: Send errors and shit to log file
+- Bars :: add wifi bar

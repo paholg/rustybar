@@ -1,9 +1,0 @@
-# To Figure out:
-- Font :: find dimensions given monospace font size (it's 1/72*dpi*fontsize). So I just
-          need a good way to find dpi. Why do we use this retarded system?
-- Globals :: Fix how global variables are done / if I can do without them (currently
-             only for text and bg color). Not sure how to import them, so for now I'll
-             define them in each bar file.
-- Strings :: Bar text is stored as a String that keeps getting added to with format!()
-             (sometimes with multiple format! calls per update). Is there a better way
-             to do this?

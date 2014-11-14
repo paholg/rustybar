@@ -173,7 +173,7 @@ fn main() {
         None => "#000000",
     };
     // fixme: this is broken
-    let char_width = textw(font.as_slice()); //font_size;//*dpi/72;
+    let char_width = textw(font.as_slice());
 
     // ----- figure out bars --------------------------------
     let empty: &[toml::Value] = [];
@@ -397,17 +397,6 @@ fn print_usage(program: &str, _opts: &[OptGroup]) {
                  opt.short_name, opt.long_name, opt.hint, String::from_char(num, ' '), opt.desc);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 fn get_resolution() -> uint {
