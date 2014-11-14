@@ -13,6 +13,10 @@ pub trait StatusBar {
     fn set_colormap(&mut self, cmap: Box<ColorMap>);
     /// Give the length in pixels of the output string.
     fn len(&self) -> uint;
+    fn get_lspace(&self) -> uint;
+    fn set_lspace(&mut self, lspace: uint);
+    fn set_width(&mut self, width: uint);
+    fn set_height(&mut self, height: uint);
 }
 
 pub fn write_one_bar(stream: &mut pipe::PipeStream, val: f32, color: Color, width: uint, height: uint) {

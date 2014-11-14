@@ -12,8 +12,6 @@ use std::io::pipe;
 
 use self::time::{Timespec, get_time};
 
-static TEXTCOLOR: &'static str = "#888888";
-
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 pub struct CpuBar {
     // Gives a mapping from the order the OS lists the processors to the order we want
@@ -26,6 +24,7 @@ pub struct CpuBar {
     pub width: uint,
     pub space: uint,
     pub height: uint,
+    lspace: uint,
 }
 
 impl CpuBar {
@@ -38,6 +37,7 @@ impl CpuBar {
             width: 20,
             space: 8,
             height: 10,
+            lspace: 0,
         }
     }
 }
@@ -104,6 +104,7 @@ impl StatusBar for CpuBar {
             let now = get_time();
             let dt = now - last;
             last = now;
+            write_space(&mut *stream, self.lspace);
             write_sep(&mut *stream, 2*self.height);
             write_space(&mut *stream, self.space);
             for i in range(0u, idles.len()) {
@@ -131,7 +132,11 @@ impl StatusBar for CpuBar {
     }
 
     fn len(&self) -> uint {
-        (self.width + self.space)*self.procs_per_core*self.num_cores +
+        self.lspace + (self.width + self.space)*self.procs_per_core*self.num_cores +
             (self.space + 2)*(self.num_cores + 1) - self.space
     }
+    fn get_lspace(&self) -> uint { self.lspace }
+    fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
+    fn set_width(&mut self, width: uint) { self.width = width }
+    fn set_height(&mut self, height: uint) { self.height = height }
 }

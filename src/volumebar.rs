@@ -1,94 +1,96 @@
-extern crate libc;
-
 use statusbar::*;
-use colormap::ColorMap;
-use std::io::File;
-use std::io::fs::PathExtensions;
-use std::io::timer;
+use colormap::{Color, ColorMap};
 use std::time::Duration;
-use std::io::pipe;
-use std::io::fs;
-use inotify::ffi;
+use std::io::{timer, pipe, Command};
+use std::string::String;
+// use std::io::process;
 
 /// A statusbar for volume information. Uses information from /sys/class/backlight/
-pub struct BrightnessBar {
-    path_cur: Path,
-    max: f32,
+pub struct VolumeBar {
+    pub card: uint,
+    pub channel: String,
+    pub mute_color: Color,
     cmap: ColorMap,
     pub width: uint,
     pub height: uint,
+    pub lspace: uint,
 }
 
-impl BrightnessBar {
-    pub fn new() -> BrightnessBar {
-        BrightnessBar {
-            path_cur: Path::new("/"),
-            max: 0.,
+impl VolumeBar {
+    pub fn new() -> VolumeBar {
+        VolumeBar {
+            card: 0,
+            channel: "Master".to_string(),
+            mute_color: Color::new(130, 0, 200),
             cmap: ColorMap::new(),
             width: 30,
             height: 10,
+            lspace: 0,
         }
     }
 }
 
-impl StatusBar for BrightnessBar {
+impl StatusBar for VolumeBar {
     fn initialize(&mut self, char_width: uint) {
         // just so it doesn't warn us about char_width being unused
         char_width + 1;
-        let path = Path::new("/sys/class/backlight");
-        if path.is_dir() {
-            let dirs = fs::readdir(&path).unwrap();
-            if dirs.len() > 1 {
-                println!("You have multiple backlight directories. They are:");
-                for dir in dirs.iter() { println!("\t{}", dir.display()); }
-                // fixme: add this to config
-                println!("I am going to use the first one. To use another, edit the configuration file (Not yet enabled).");
-            }
-            self.path_cur = dirs[0].join("brightness");
-            assert!(self.path_cur.exists(), "The file {} doesn't exists. I can't make a brightness bar.", self.path_cur.display());
-            let path_max = dirs[0].join("max_brightness");
-            assert!(path_max.exists(), "The file {} doesn't exists. I can't make a brightness bar.", path_max.display());
-            let max_string = File::open(&path_max).read_to_string().unwrap();
-            self.max = from_str(max_string.trim().as_slice()).unwrap();
-            println!("max: {}", self.max);
-        }
-        else {
-            panic!("The directory: {} doesn't exist. The brightness bar won't work.");
-        }
     }
     fn run(&self, mut stream: Box<pipe::PipeStream>) {
-        let mut fd: i32;
-        //let mut wd: i32;
-
-        unsafe {
-            fd = ffi::inotify_init();
-            assert!(fd >= 0, "Invalid file descriptor in brightness bar.");
-            // wd = ffi::inotify_add_watch(fd, self.path_cur.to_c_str().as_ptr(),
-            //                                      ffi::IN_MODIFY);
-            ffi::inotify_add_watch(fd, self.path_cur.to_c_str().as_ptr(),
-                                   ffi::IN_MODIFY);
-        }
-        let mut buffer = [0u8, ..1024];
+        let re_vol = regex!(r"Playback.*\[(\d+)%\]");
+        let re_mute = regex!(r"Playback.*\[(on|off)\]\s*$");
         loop {
-            let cur_string = File::open(&self.path_cur).read_to_string().unwrap();
-            let cur: f32 = from_str(cur_string.trim().as_slice()).unwrap();
-            let val = cur/self.max;
-            write_one_bar(&mut *stream, val, self.cmap.map((val*100.) as u8), self.width, self.height);
-            match stream.write_str("\n") {
-                Err(msg) => println!("Trouble writing to brightness bar: {}", msg),
+            let info = match Command::new("amixer").args([
+                "-c",
+                self.card.to_string().as_slice(),
+                "sget",
+                self.channel.as_slice()]).output() {
+                Ok(out) => out,
+                Err(msg) => panic!("Failed to run amixer with message: {}", msg),
+            };
+            // println!("stat: {}", info.status);
+            if info.status.success() == false {
+                println!("amixer returned exit signal {}.", info.status);
+                println!("error: {}", String::from_utf8(info.error).unwrap());
+            }
+            let output = String::from_utf8(info.output).unwrap();
+            let mut cap = re_vol.captures_iter(output.as_slice());
+            let v = match cap.nth(0) {
+                Some(val) => val,
+                None => panic!("Volume bar error. Couldn't find value."),
+            };
+            let val: u8 = from_str(v.at(1)).unwrap();
+            let mut cap = re_mute.captures_iter(output.as_slice());
+            let state = match cap.nth(0) {
+                Some(val) => val,
+                None => panic!("Volume bar error. Couldn't find mute state."),
+            };
+            let color = match state.at(1) {
+                "on" => self.cmap.map(val),
+                "off" => self.mute_color,
+                _ => panic!("This can't happen"),
+            };
+            write_space(&mut *stream, self.lspace);
+            match stream.write_str("^ca(1,xdotool key XF86AudioMute)^ca(4,xdotool key XF86AudioRaiseVolume)^ca(5,xdotool key XF86AudioLowerVolume)") {
+                Err(msg) => println!("Trouble writing to volume bar: {}", msg),
                 Ok(_) => (),
-            }
-            timer::sleep(Duration::milliseconds(30));
-            unsafe {
-                ffi::read(fd, buffer.as_mut_ptr() as *mut libc::c_void,
-                          buffer.len() as u64);
-            }
+            };
+            write_one_bar(&mut *stream, (val as f32)/100., color, self.width, self.height);
+            match stream.write_str("^ca()^ca()^ca()\n") {
+                Err(msg) => println!("Trouble writing to volume bar: {}", msg),
+                Ok(_) => (),
+            };
+            timer::sleep(Duration::seconds(1));
         }
     }
     fn set_colormap(&mut self, cmap: Box<ColorMap>) {
         self.cmap = *cmap;
     }
     fn len(&self) -> uint {
-        self.width
+        self.lspace + self.width
     }
+    fn get_lspace(&self) -> uint { self.lspace }
+    fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
+    fn set_width(&mut self, width: uint) { self.width = width }
+    fn set_height(&mut self, height: uint) { self.height = height }
 }
+

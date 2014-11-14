@@ -20,6 +20,7 @@ pub struct BatteryBar {
     pub width: uint,
     pub space: uint,
     pub height: uint,
+    pub lspace: uint,
 }
 
 impl BatteryBar {
@@ -33,6 +34,7 @@ impl BatteryBar {
             width: 30,
             space: 8,
             height: 10,
+            lspace: 0,
         }
     }
     /// sets the battery number to use
@@ -65,6 +67,7 @@ impl StatusBar for BatteryBar {
             let cap_string = File::open(&self.path_capacity).read_to_string().unwrap();
             let capacity: u8 = from_str(cap_string.trim().as_slice()).unwrap();
 
+            write_space(&mut *stream, self.lspace);
             write_one_bar(&mut *stream, (capacity as f32)/100., self.cmap.map(capacity), self.width, self.height);
             write_space(&mut *stream, self.space);
             let status_string = File::open(&self.path_status).read_to_string().unwrap();
@@ -85,6 +88,10 @@ impl StatusBar for BatteryBar {
         self.cmap = *cmap;
     }
     fn len(&self) -> uint {
-        self.width + self.space + self.char_width
+        self.lspace + self.width + self.space + self.char_width
     }
+    fn get_lspace(&self) -> uint { self.lspace }
+    fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
+    fn set_width(&mut self, width: uint) { self.width = width }
+    fn set_height(&mut self, height: uint) { self.height = height }
 }

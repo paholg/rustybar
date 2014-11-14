@@ -17,6 +17,7 @@ pub struct BrightnessBar {
     cmap: ColorMap,
     pub width: uint,
     pub height: uint,
+    pub lspace: uint,
 }
 
 impl BrightnessBar {
@@ -27,6 +28,7 @@ impl BrightnessBar {
             cmap: ColorMap::new(),
             width: 30,
             height: 10,
+            lspace: 0,
         }
     }
 }
@@ -50,7 +52,7 @@ impl StatusBar for BrightnessBar {
             assert!(path_max.exists(), "The file {} doesn't exists. I can't make a brightness bar. Please report this.", path_max.display());
             let max_string = File::open(&path_max).read_to_string().unwrap();
             self.max = from_str(max_string.trim().as_slice()).unwrap();
-            println!("max: {}", self.max);
+            //println!("max: {}", self.max);
         }
         else {
             panic!("The directory: {} doesn't exist. The brightness bar won't work.");
@@ -73,8 +75,14 @@ impl StatusBar for BrightnessBar {
             let cur_string = File::open(&self.path_cur).read_to_string().unwrap();
             let cur: f32 = from_str(cur_string.trim().as_slice()).unwrap();
             let val = cur/self.max;
+            write_space(&mut *stream, self.lspace);
+            match stream.write_str(
+                "^ca(4,xdotool key XF86MonBrightnessUp)^ca(5,xdotool key XF86MonBrightnessDown)") {
+                Err(msg) => println!("Trouble writing to brightness bar: {}", msg),
+                Ok(_) => (),
+            }
             write_one_bar(&mut *stream, val, self.cmap.map((val*100.) as u8), self.width, self.height);
-            match stream.write_str("\n") {
+            match stream.write_str("^ca()^ca()\n") {
                 Err(msg) => println!("Trouble writing to brightness bar: {}", msg),
                 Ok(_) => (),
             }
@@ -89,6 +97,10 @@ impl StatusBar for BrightnessBar {
         self.cmap = *cmap;
     }
     fn len(&self) -> uint {
-        self.width
+        self.lspace + self.width
     }
+    fn get_lspace(&self) -> uint { self.lspace }
+    fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
+    fn set_width(&mut self, width: uint) { self.width = width }
+    fn set_height(&mut self, height: uint) { self.height = height }
 }

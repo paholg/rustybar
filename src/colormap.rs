@@ -1,6 +1,6 @@
 use std::fmt;
-use std::iter::{range_step};
-
+//use serialize::hex::FromHex;
+use std::num::FromStrRadix;
 /// An RGB triplet
 pub struct Color {
     pub r: u8,
@@ -10,15 +10,25 @@ pub struct Color {
 
 impl Color {
     /// creates a Color object, guaranteeing that the colors are acceptable values.
-    pub fn new(red: f32, green: f32, blue: f32) -> Color {
-        assert!((red >= 0.0) && (red <= 1.0), "Tried to set a red color value to {} (needs to be in [0,1])", red);
-        assert!((green >= 0.0) && (green <= 1.0), "Tried to set a green color value to {} (needs to be in [0,1])", green);
-        assert!((blue >= 0.0) && (blue <= 1.0), "Tried to set a blue color value to {} (needs to be in [0,1])", blue);
-        Color{r: (red*255.) as u8, g: (green*255.) as u8, b: (blue*255.) as u8}
+    pub fn new(red: u8, green: u8, blue: u8) -> Color {
+        Color{r: red, g: green, b: blue}
     }
-    // pub fn newu<'a>(red: &'a u8, green: &'a u8, blue: &'a u8) -> &'a Color {
-    //     &Color{r: *red, g: *green, b: *blue}
-    // }
+
+    /// expects a color in the format "#ffffff"
+    pub fn from_str(color: &str) -> Color {
+        assert!(color.len() == 7, "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
+        let mut c = color.chars();
+        let hash = c.nth(0).unwrap();
+        assert!(hash == '#', "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
+        let num: u32 = match FromStrRadix::from_str_radix(color.slice(1,7), 16) {
+            Some(val) => val,
+            None => panic!("Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color),
+        };
+        let red = num >> 16;
+        let green = (num >> 8) & 255;
+        let blue = num & 255;
+        Color{r: red as u8, g: green as u8, b: blue as u8}
+    }
 }
 
 impl fmt::Show for Color {
@@ -42,7 +52,7 @@ impl ColorMap {
     /// Creates a new colormap. To start, it maps 0 to black and 100 to white, but these
     /// values are changeable.
     pub fn new() -> ColorMap {
-        ColorMap{colors: vec![Color::new(0., 0., 0.), Color::new(1., 1., 1.)], values: vec![0, 100]}
+        ColorMap{colors: vec![Color::new(0, 0, 0), Color::new(255, 255, 255)], values: vec![0, 100]}
     }
 
     /// Adds a (value, color) pair to the colormap. Value must be in the range
@@ -83,13 +93,6 @@ impl ColorMap {
         Color{r: red, g: green, b: blue}
     }
 
-    /// Print even numbers from 0 to 100, each with the appropriate color code.
-    pub fn test(&self) {
-        for i in range_step(0u8, 101, 2) {
-            print!("^fg({}){} ", self.map(i), i);
-        }
-        println!("");
-    }
     // fixme: add show?
     // fixme: we should have a way to to remove elements
 }

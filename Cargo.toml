@@ -1,7 +1,7 @@
 [package]
 
 name = "rustybar"
-version = "0.0.3"
+version = "0.1.0"
 authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 
 [dependencies.inotify]
@@ -10,8 +10,8 @@ git = "https://github.com/hannobraun/inotify-rs"
 [dependencies.xlib]
 git = "https://github.com/servo/rust-xlib"
 
-# [dependencies.glob]
-# git = "https://github.com/rust-lang/glob.git"
-
 [dependencies.toml]
 git = "https://github.com/alexcrichton/toml-rs"
+
+# [dependencies.alsa]
+# git = "https://github.com/cyndis/rust-alsa"
