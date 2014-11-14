@@ -1,4 +1,17 @@
+# Urgent (do before "release")
 - Font :: get width in pixels of characters
 - Errors :: Do real error handling instead of just panicking everywhere
-- Logging :: Send errors and shit to log file
-- Bars :: add wifi bar
+- Bars :: add network bar
+- Logging :: Send error output to log file
+
+# Semi important
+- Volume :: Use a sound library to be able to update in real time
+- Color parsing :: the config file should support single colors either as [r, g, b] or
+                   as hex string.
+- Bug testing :: Especially make sure files / command outputs used are universal
+
+# Eventual
+- Backend :: Replace dzen2 with something built-in. I don't really want to write to XLib
+             myself, but don't know what else would be nearly as lightweight.
+- Config :: Clean up the interpretation code. I'm sure it wouldn't be that hard to make
+            it a lot nicer.
