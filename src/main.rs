@@ -80,6 +80,7 @@ fn main() {
                "Config directory. Default is $HOME/.config/rustybar/",
                "NAME"),
         optflag("h", "help", "Print this help menu"),
+        optflag("v", "version", "Print version info"),
         ];
     let matches = match getopts(args.tail(), opts) {
         Ok(m) => { m }
@@ -87,6 +88,10 @@ fn main() {
     };
     if matches.opt_present("h") {
         print_usage(program.as_slice(), opts);
+        return;
+    }
+    if matches.opt_present("v") {
+        print!("{}", version_info());
         return;
     }
     let dir = match matches.opt_str("d") {
@@ -707,8 +712,18 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
     };
 }
 
+fn version_info<'a>() -> &'a str {
+    r###"
+Rustybar version 0.1.1, Copyright (C) 2014 Paho Lurie-Gregg
+Rustybar comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it.
+
+Written by Paho Lurie-Gregg.
+"###
+}
+
 fn default_config<'a>() -> &'a [u8] {
-br###"
+    br###"
 # --- global parameters ------
 # Note: I don't currently obtain font size correctly for determining the pixel width of
 # characters, so bars that include text will not be sized correctly.
