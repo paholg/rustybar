@@ -19,9 +19,8 @@ extern crate time;
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::{File};
+use std::io::{File, timer};
 use std::io::fs::PathExtensions;
-use std::io::timer;
 use std::time::Duration;
 use std::io::pipe;
 
@@ -123,7 +122,10 @@ impl StatusBar for CpuBar {
             write_sep(&mut *stream, 2*self.height);
             write_space(&mut *stream, self.space);
             for i in range(0u, idles.len()) {
-                let val = 1.0 - ((idles[i] - old_idles[i]) as f32)/(dt.num_nanoseconds().unwrap() as f32)*1e7;
+                let usage = 1.0 - ((idles[i] - old_idles[i]) as f32)/(dt.num_nanoseconds().unwrap() as f32)*1e7;
+                let val = if usage > 1.0 { 1.0 }
+                          else if usage < 0.0 { 0.0 }
+                          else { usage };
                 let color =  self.cmap.map((val*100.0) as u8);
                 write_one_bar(&mut *stream, val, color, self.width, self.height);
                 write_space(&mut *stream, self.space);
