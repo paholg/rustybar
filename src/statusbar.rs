@@ -36,7 +36,8 @@ pub trait StatusBar {
 }
 
 pub fn write_one_bar(stream: &mut pipe::PipeStream, val: f32, color: Color, width: uint, height: uint) {
-    let wfill = (val*(width as f32).round()) as uint;
+    // fixme: .round()?
+    let wfill = (val*(width as f32) + 0.5) as uint;
     let wempty = width - wfill;
     match write!(stream, "^fg({0})^r({2}x{1})^ro({3}x{1})", color, height, wfill, wempty) {
         Err(msg) => panic!("Failed to write pipe: {}", msg.desc),

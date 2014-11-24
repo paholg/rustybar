@@ -55,7 +55,7 @@ impl StatusBar for VolumeBar {
         let re_vol = regex!(r"Playback.*\[(\d+)%\]");
         let re_mute = regex!(r"Playback.*\[(on|off)\]\s*$");
         loop {
-            let info = match Command::new("amixer").args([
+            let info = match Command::new("amixer").args(&[
                 "-c",
                 self.card.to_string().as_slice(),
                 "sget",

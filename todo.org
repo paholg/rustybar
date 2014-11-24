@@ -2,6 +2,8 @@
 - Font :: get width of characters in pixels
 - Errors :: Do real error handling instead of just panicking everywhere
 - Logging :: Send error output to log file
+- Config :: Clean up the interpretation code. I'm sure it wouldn't be that hard to make
+            it a lot nicer. Look into functional ways to do this, like filter_map()
 
 # Dependencies
 dzen2 - bars
@@ -12,6 +14,7 @@ xrandr - resolution
 # Features to add
 - Volume :: Use a sound library to be able to update in real time
 - Battery :: Add charge / discharge time (different color for each, make the +/- of the battery bar optional)
+             This will involve switching from using /sys/class directly to using acpi
 - Network :: Add indicator, also bar for wifi signal strength
 - Color parsing :: the config file should support single colors either as [r, g, b] or
                    as hex string.
@@ -23,5 +26,4 @@ xrandr - resolution
 # Eventual
 - Backend :: Replace dzen2 with something built-in. I don't really want to write to XLib
              myself, but don't know what else would be nearly as lightweight.
-- Config :: Clean up the interpretation code. I'm sure it wouldn't be that hard to make
-            it a lot nicer.
+- Cpu graph :: can't do until replacing backend

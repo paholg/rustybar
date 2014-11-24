@@ -41,8 +41,8 @@ use std::os;
 
 use toml::*;
 
-// use std::ptr::RawPtr;
-// use xlib::*;
+use std::ptr::RawPtr;
+use xlib::*;
 
 use colormap::{ColorMap, Color};
 use statusbar::StatusBar;
@@ -73,6 +73,7 @@ mod volumebar;
 
 fn main() {
     // -- option parsing ---------------------------------------------
+    let mut v: Vec<Box<StatusBar>> = Vec::new();
     let args: Vec<String> = os::args();
     let program = args[0].clone();
     let opts = [
@@ -82,12 +83,12 @@ fn main() {
         optflag("h", "help", "Print this help menu"),
         optflag("v", "version", "Print version info"),
         ];
-    let matches = match getopts(args.tail(), opts) {
+    let matches = match getopts(args.tail(), &opts) {
         Ok(m) => { m }
         Err(f) => { panic!(f.to_string()) }
     };
     if matches.opt_present("h") {
-        print_usage(program.as_slice(), opts);
+        print_usage(program.as_slice(), &opts);
         return;
     }
     if matches.opt_present("v") {
@@ -137,7 +138,7 @@ fn main() {
     };
 
     // -- get resolution and dpi (fixme) ------------
-    let dpi = get_dpi(96);
+    // let dpi = get_dpi(96);
     let res = get_resolution();
 
     // ---------- settings from config file -----------------------------------------
@@ -181,7 +182,7 @@ fn main() {
     let char_width = textw(font.as_slice());
 
     // ----- figure out bars --------------------------------
-    let empty: &[toml::Value] = [];
+    let empty: &[toml::Value] = &[];
     let center_bars: &[toml::Value] = match toml.get(&"center".to_string()) {
         Some(val) => match val.as_slice() {
             Some(list) => list,
@@ -334,7 +335,7 @@ fn main() {
     let mut bar_processes: Vec<process::Process> = Vec::new();
     let mut streams: Vec<Box<pipe::PipeStream>> = Vec::new();
     for i in range(0u, bars.len()) {
-        let mut process = match Command::new("dzen2").args([
+        let mut process = match Command::new("dzen2").args(&[
             "-fn",
             font.as_slice(),
             "-x",
@@ -458,39 +459,29 @@ fn get_resolution() -> uint {
 //     }
 // }
 
-fn textw(fontstr: &str) -> uint {
-    // unsafe {
-    //     let display = XOpenDisplay(RawPtr::null());
-    //     //println!("boo!: {}", x);
-    //     let mut fnt = fontstr.to_c_str().as_mut_ptr();
-    //     //let mut fnt = "fixed".to_c_str().as_mut_ptr();
-    //     XLoadFont(display, fnt);
-    //     let font: *mut XFontStruct = XLoadQueryFont(display, fnt);
-    //     let wid = XTextWidth(font, "X".to_c_str().as_mut_ptr(), 1);
-    //     println!("wid: {}", wid)
-    //     //XUnloadFont(display, fnt);
+fn textw(font: &str) -> uint {
+    // let cmd1 = Command::new("xterm").args([
+    //     "-fa", font,
+    //     "-geometry", "40x10",
+    //     "-e", "'xwininfo -id $WINDOWID'"]).output();
+    // let cmd2 = Command::new("xterm").args([
+    //     "-fa", font,
+    //     "-geometry", "80x20",
+    //     "-e", "'xwininfo -id $WINDOWID"]).output();
+    // println!("{}", cmd1.unwrap().output);
+    // println!("{}", cmd1.unwrap().status);
 
-    // }
-    9
-}
-fn get_dpi(default: uint) -> uint {
-    let path = Path::new("/var/log/Xorg.0.log");
-    if !path.exists() {
-        // fixme: make this an actual warning if such exists -- couldn't find it
-        println!("Warning!! couldn't find Xorg log to set dpi. Using the default of {}. If this is wrong, your bars won't be sized correctly. The log file searched for was: {}", default, path.display());
-        return default;
+    unsafe {
+        let dpy = XOpenDisplay (RawPtr::null());
+        let test = "-*-*-*-R-Normal--*-180-100-100-*-*".to_c_str().as_mut_ptr();
+        let mut i = 0i8;
+        let missing: *mut *mut *mut i8 = &mut (&mut (&mut 0 as *mut i8) as *mut *mut i8) as *mut *mut *mut i8;
+        let n: *mut i32 = &mut 0 as *mut i32;
+        let def: *mut *mut i8 = &mut (&mut 0 as *mut i8) as *mut *mut i8;
+        let x = XCreateFontSet(dpy, test, missing, n, def);
+        println!("{}, {}, {}, {}, {}, {}", dpy, *test, ***missing, *n, **def, x);
     }
-    let x_log = File::open(&path).read_to_string().unwrap();
-    let re = regex!(r"DPI.*?\((\d+),\s\d+\)");
-    let mut dpi: uint = 0;
-    for cap in re.captures_iter(x_log.as_slice()) {
-        dpi = from_str(cap.at(1)).unwrap();
-    }
-    if dpi == 0 {
-        println!("Warning!! I couldn't find your dpi. Using the default of {}. If this is wrong, your bars won't be sized correctly. The log file searched was: {}", default, path.display());
-        return default;
-    }
-    dpi
+    7
 }
 
 fn extract_bars_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, lefts: &mut Vec<uint>,
