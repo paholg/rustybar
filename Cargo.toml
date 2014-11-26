@@ -13,5 +13,8 @@ git = "https://github.com/servo/rust-xlib"
 [dependencies.toml]
 git = "https://github.com/alexcrichton/toml-rs"
 
+[dependencies.time]
+git = "http://github.com/rust-lang/time"
+
 # [dependencies.alsa]
 # git = "https://github.com/cyndis/rust-alsa"

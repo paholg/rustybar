@@ -73,7 +73,6 @@ mod volumebar;
 
 fn main() {
     // -- option parsing ---------------------------------------------
-    let mut v: Vec<Box<StatusBar>> = Vec::new();
     let args: Vec<String> = os::args();
     let program = args[0].clone();
     let opts = [
@@ -471,16 +470,16 @@ fn textw(font: &str) -> uint {
     // println!("{}", cmd1.unwrap().output);
     // println!("{}", cmd1.unwrap().status);
 
-    unsafe {
-        let dpy = XOpenDisplay (RawPtr::null());
-        let test = "-*-*-*-R-Normal--*-180-100-100-*-*".to_c_str().as_mut_ptr();
-        let mut i = 0i8;
-        let missing: *mut *mut *mut i8 = &mut (&mut (&mut 0 as *mut i8) as *mut *mut i8) as *mut *mut *mut i8;
-        let n: *mut i32 = &mut 0 as *mut i32;
-        let def: *mut *mut i8 = &mut (&mut 0 as *mut i8) as *mut *mut i8;
-        let x = XCreateFontSet(dpy, test, missing, n, def);
-        println!("{}, {}, {}, {}, {}, {}", dpy, *test, ***missing, *n, **def, x);
-    }
+    // unsafe {
+    //     let dpy = XOpenDisplay (RawPtr::null());
+    //     let test = "-*-*-*-R-Normal--*-180-100-100-*-*".to_c_str().as_mut_ptr();
+    //     let mut i = 0i8;
+    //     let missing: *mut *mut *mut i8 = &mut (&mut (&mut 0 as *mut i8) as *mut *mut i8) as *mut *mut *mut i8;
+    //     let n: *mut i32 = &mut 0 as *mut i32;
+    //     let def: *mut *mut i8 = &mut (&mut 0 as *mut i8) as *mut *mut i8;
+    //     let x = XCreateFontSet(dpy, test, missing, n, def);
+    //     println!("{}, {}, {}, {}, {}, {}", dpy, *test, ***missing, *n, **def, x);
+    // }
     7
 }
 
