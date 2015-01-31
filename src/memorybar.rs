@@ -19,11 +19,11 @@ extern crate time;
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::{File};
-use std::io::fs::PathExtensions;
-use std::io::timer;
+use std::old_io::{File};
+use std::old_io::fs::PathExtensions;
+use std::old_io::timer;
 use std::time::Duration;
-use std::io::pipe;
+use std::old_io::pipe;
 
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 pub struct MemoryBar {
@@ -60,13 +60,14 @@ impl StatusBar for MemoryBar {
         let re_buffers = regex!(r"Buffers.*?(\d+)");
         let re_cached = regex!(r"Cached.*?(\d+)");
         let info = File::open(&path).read_to_string().unwrap();
-        let total: f32 = from_str(re_tot.captures_iter(info.as_slice()).nth(0).unwrap().at(1)).unwrap();
+        // fixme: need to redo with new syntax
+        let total: f32 = 1.0;//re_tot.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
         // -------------------
         loop {
             let info = File::open(&path).read_to_string().unwrap();
-            let free: f32 = from_str(re_free.captures_iter(info.as_slice()).nth(0).unwrap().at(1)).unwrap();
-            let buffers: f32 = from_str(re_buffers.captures_iter(info.as_slice()).nth(0).unwrap().at(1)).unwrap();
-            let cached: f32 = from_str(re_cached.captures_iter(info.as_slice()).nth(0).unwrap().at(1)).unwrap();
+            let free: f32 = 0.0; //re_free.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
+            let buffers: f32 = 0.0; //re_buffers.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
+            let cached: f32 = 0.0; //re_cached.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
             let val = (total - free - buffers - cached)/total;
 
             write_space(&mut *stream, self.lspace);

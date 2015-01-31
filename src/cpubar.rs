@@ -19,10 +19,10 @@ extern crate time;
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::{File, timer};
-use std::io::fs::PathExtensions;
+use std::old_io::{File, timer, pipe};
+use std::old_io::fs::PathExtensions;
 use std::time::Duration;
-use std::io::pipe;
+use std::str::FromStr;
 
 use self::time::{Timespec, get_time};
 
@@ -72,19 +72,27 @@ impl StatusBar for CpuBar {
         // want to first get number of cores and processors
         let re_core = regex!(r"(?s)cpu\scores\s:\s(\d+).*?siblings\s:\s(\d+)");
         let cap = re_core.captures_iter(cpu_info.as_slice()).nth(0).unwrap();
-        self.num_cores = from_str(cap.at(1)).unwrap();
-        let procs: uint = from_str(cap.at(2)).unwrap();
+        self.num_cores = FromStr::from_str(cap.at(1).unwrap()).unwrap();
+        let procs: uint = FromStr::from_str(cap.at(2).unwrap()).unwrap();
         if procs == 0 { panic!("Something went wrong with finding number of processors."); }
         self.procs_per_core = procs/self.num_cores;
-        self.proc_map.grow(procs, 0);
+        // fixme: there should be a better way to set length
+        self.proc_map.reserve_exact(procs);
+        for _ in [..procs].iter() {
+            self.proc_map.push(0);
+        }
         // now we want to get the map from processor number to display order
         // note: I have the .*? after core id because \s:\s doesn't match for some reason.
         let re_map = regex!(r"(?s)processor\s:\s(\d+).*?core id.*?(\d+)");
         let mut proc_counter: Vec<uint> = Vec::new();
-        proc_counter.grow(self.num_cores, 0);
+        //fixme: there should be a better way to initialize this
+        proc_counter.reserve_exact(self.num_cores);
+        for _ in [..self.num_cores].iter() {
+            proc_counter.push(0);
+        }
         for cap in re_map.captures_iter(cpu_info.as_slice()) {
-            let proc_id: uint = from_str(cap.at(1)).unwrap();
-            let core_id: uint = from_str(cap.at(2)).unwrap();
+            let proc_id: uint = FromStr::from_str(cap.at(1).unwrap()).unwrap();
+            let core_id: uint = FromStr::from_str(cap.at(2).unwrap()).unwrap();
             self.proc_map[proc_id] = core_id*self.procs_per_core + proc_counter[core_id];
             proc_counter[core_id] += 1;
         }
@@ -96,23 +104,33 @@ impl StatusBar for CpuBar {
             panic!("The file {} does not exist. You cannot use the cpu bar without it. Are you sure you're running GNU/Linux?", path.display());
         }
         let re = regex!(r"cpu(\d+)\s(\d+\s){3}(\d+)");
-        let mut old_idles: Vec<uint> = Vec::from_elem(self.proc_map.len(), 0);
+        // fixme: there should be a better way to initialize this to an array of zeros
+        // used to be Vec::from_elem()
+        let mut old_idles: Vec<uint> = Vec::with_capacity(self.proc_map.len());
+        for _ in [..self.proc_map.len()].iter() {
+            old_idles.push(0);
+        }
         // setting old_idles (this is redundant code and should be removed for a better solution)
         let info = File::open(&path).read_to_string().unwrap();
         for cap in re.captures_iter(info.as_slice()) {
-            let proc_id: uint = from_str(cap.at(1)).unwrap();
-            let idle: uint = from_str(cap.at(3)).unwrap();
+            let proc_id: uint = FromStr::from_str(cap.at(1).unwrap()).unwrap();
+            let idle: uint = FromStr::from_str(cap.at(3).unwrap()).unwrap();
             old_idles[self.proc_map[proc_id]] = idle;
         }
         // -------------------
         let mut last: Timespec = get_time();
         loop {
             timer::sleep(Duration::seconds(1));
-            let mut idles: Vec<uint> = Vec::from_elem(self.proc_map.len(), 0);
+            // fixme: there should be a better way to initialize this to an array of zeros
+            // used to be Vec::from_elem()
+            let mut idles: Vec<uint> = Vec::with_capacity(self.proc_map.len());
+            for _ in [..self.proc_map.len()].iter() {
+                idles.push(0);
+            }
             let info = File::open(&path).read_to_string().unwrap();
             for cap in re.captures_iter(info.as_slice()) {
-                let proc_id: uint = from_str(cap.at(1)).unwrap();
-                let idle: uint = from_str(cap.at(3)).unwrap();
+                let proc_id: uint = FromStr::from_str(cap.at(1).unwrap()).unwrap();
+                let idle: uint = FromStr::from_str(cap.at(3).unwrap()).unwrap();
                 idles[self.proc_map[proc_id]] = idle;
             }
             let now = get_time();

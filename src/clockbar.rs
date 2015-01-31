@@ -17,9 +17,9 @@
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::timer;
+use std::old_io::timer;
 use std::time::Duration;
-use std::io::pipe;
+use std::old_io::pipe;
 use time;
 
 /// A statusbar for testing colormaps.

@@ -19,11 +19,10 @@
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::File;
-use std::io::fs::PathExtensions;
-use std::io::timer;
+use std::old_io::{File, timer, pipe};
+use std::old_io::fs::PathExtensions;
 use std::time::Duration;
-use std::io::pipe;
+use std::str::FromStr;
 
 
 /// A statusbar for battery information. All data is gathered from '/sys/class/power_supply/BAT#/'
@@ -82,7 +81,7 @@ impl StatusBar for BatteryBar {
     fn run(&self, mut stream: Box<pipe::PipeStream>) {
         loop {
             let cap_string = File::open(&self.path_capacity).read_to_string().unwrap();
-            let capacity: u8 = from_str(cap_string.trim().as_slice()).unwrap();
+            let capacity: u8 = FromStr::from_str(cap_string.trim().as_slice()).unwrap();
 
             write_space(&mut *stream, self.lspace);
             write_one_bar(&mut *stream, (capacity as f32)/100., self.cmap.map(capacity), self.width, self.height);

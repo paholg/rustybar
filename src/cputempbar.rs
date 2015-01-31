@@ -19,9 +19,10 @@ extern crate time;
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::{timer, pipe, Command};
+use std::old_io::{timer, pipe, Command};
 use std::string::String;
 use std::time::Duration;
+use std::str::FromStr;
 
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 pub struct CpuTempBar {
@@ -69,7 +70,7 @@ impl StatusBar for CpuTempBar {
                 Some(val) => val,
                 None => panic!("Cpu temp bar error. Couldn't find value."),
             };
-            let temp: f32 = from_str(t.at(1)).unwrap();
+            let temp: f32 = FromStr::from_str(t.at(1).unwrap()).unwrap();
             let val: f32 =
                 if temp > self.max {1.0}
                 else if temp < self.min {0.0}

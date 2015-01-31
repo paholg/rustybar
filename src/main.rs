@@ -15,34 +15,37 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#![feature(int_uint)]
+#![feature(plugin)]
 
-#![feature(globs)]
-#![feature(phase)]
-#[phase(plugin)]
-extern crate regex_macros;
+#[macro_use(regex)]
+#[plugin] extern crate regex_macros;
 extern crate regex;
 extern crate inotify;
 extern crate time;
 extern crate core;
-extern crate xlib;
+//extern crate xlib;
 extern crate serialize;
 
 // #![feature(phase)]
-#[phase(plugin, link)]
+// #[phase(plugin, link)]
 extern crate log;
 extern crate collections;
 extern crate toml;
 extern crate getopts;
 
-use std::io::{Command, File, process, pipe, fs, FilePermission};
-use std::io::fs::PathExtensions;
+use std::old_io::{Command, File, process, pipe, fs, FilePermission};
+use std::old_io::fs::PathExtensions;
 use getopts::{optopt,optflag,getopts,OptGroup};
 use std::os;
+use std::str::FromStr;
+use std::thread::Thread;
+use core::fmt::Debug;
 
 use toml::*;
 
-use std::ptr::RawPtr;
-use xlib::*;
+//use std::ptr::RawPtr;
+//use xlib::*;
 
 use colormap::{ColorMap, Color};
 use statusbar::StatusBar;
@@ -133,7 +136,7 @@ fn main() {
     let toml = match parser.parse() {
         Some(toml) => toml,
         // fixme: error handle better
-        None => panic!("Errors in config file:\n{}", parser.errors),
+        None => panic!("Errors in config file:\n{:?}", parser.errors),
     };
 
     // -- get resolution and dpi (fixme) ------------
@@ -354,13 +357,13 @@ fn main() {
             Err(msg) => panic!("Couldn't make dzen bar: {}", msg.desc),
             Ok(process) => process,
         };
-        let stdin = box process.stdin.take().unwrap();
+        let stdin = Box::new(process.stdin.take().unwrap());
         streams.push(stdin);
         bar_processes.push(process);
     }
 
     for (bar, stream) in bars.into_iter().zip(streams.into_iter()) {
-        spawn( proc() {bar.run(stream);} );
+        Thread::spawn( move || {bar.run(stream);} );
     }
 
 
@@ -398,8 +401,9 @@ fn print_usage(program: &str, _opts: &[OptGroup]) {
         let len = opt.long_name.len() + opt.hint.len();
         let num = if len > width { 0 }
         else { width - len };
-        println!("  -{}, --{}={}  {}{}",
-                 opt.short_name, opt.long_name, opt.hint, String::from_char(num, ' '), opt.desc);
+        // fixme!
+        // println!("  -{}, --{}={}  {}{}",
+        //          opt.short_name, opt.long_name, opt.hint, String::from_char(num, ' '), opt.desc);
     }
 }
 
@@ -413,7 +417,7 @@ fn get_resolution() -> uint {
     let out = process.stdout.as_mut().unwrap().read_to_string().unwrap();
     let re = regex!(r"current\s(\d+)\sx\s\d+");
     let cap = re.captures_iter(out.as_slice()).nth(0).unwrap();
-    let res: uint = from_str(cap.at(1)).unwrap();
+    let res: uint = FromStr::from_str(cap.at(1).unwrap()).unwrap();
     res
 }
 
@@ -502,7 +506,7 @@ fn extract_bars_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, lefts: &mut Vec<u
                     Some(integer) => integer as int,
                     None => panic!("Invalid value for space: {}", val),
                 },
-                None => panic!("The entries must either contain a bar name or be a space. This one is bad: {}",
+                None => panic!("The entries must either contain a bar name or be a space. This one is bad: {:?}",
                                table),
             };
             if sp < 0 {
@@ -538,17 +542,17 @@ fn extract_bars_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, lefts: &mut Vec<u
     }
 }
 
-fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
+fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &Table) {
     let bar_name = match toml.get(&"bar".to_string()) {
         Some(name) => match name.as_str() {
             Some(string) => string,
             None => panic!("Invalid bar: {}", name),
         },
-        None => panic!("Invalid config entry. Must either be space or include a bar name: {}", toml),
+        None => panic!("Invalid config entry. Must either be space or include a bar name: {:?}", toml),
     };
     match bar_name {
         "battery" => {
-            let mut bar = box BatteryBar::new();
+            let mut bar = Box::new(BatteryBar::new());
             match toml.get(&"space".to_string()) {
                 Some(val) => match val.as_integer() {
                     Some(integer) => bar.space = integer as uint,
@@ -566,10 +570,10 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
             bars.push(bar);
         },
         "brightness" => {
-            bars.push(box BrightnessBar::new());
+            bars.push(Box::new(BrightnessBar::new()));
         },
         "clock" => {
-            let mut bar = box ClockBar::new();
+            let mut bar = Box::new(ClockBar::new());
             match toml.get(&"format".to_string()) {
                 Some(val) => match val.as_str() {
                     Some(string) => bar.format = string.to_string(),
@@ -587,7 +591,7 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
             bars.push(bar);
         },
         "cpu" => {
-            let mut bar = box CpuBar::new();
+            let mut bar = Box::new(CpuBar::new());
             match toml.get(&"space".to_string()) {
                 Some(val) => match val.as_integer() {
                     Some(integer) => bar.space = integer as uint,
@@ -598,7 +602,7 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
             bars.push(bar);
         },
         "cpu_temp" => {
-            let mut bar = box CpuTempBar::new();
+            let mut bar = Box::new(CpuTempBar::new());
             match toml.get(&"min".to_string()) {
                 Some(val) => match val.as_float() {
                     Some(num) => bar.min = num as f32,
@@ -616,13 +620,13 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
             bars.push(bar);
         },
         "memory" => {
-            bars.push(box MemoryBar::new());
+            bars.push(Box::new(MemoryBar::new()));
         },
         "test" => {
-            bars.push(box TestBar::new());
+            bars.push(Box::new(TestBar::new()));
         },
         "stdin" => {
-            let mut bar = box StdinBar::new();
+            let mut bar = Box::new(StdinBar::new());
             match toml.get(&"length".to_string()) {
                 Some(val) => match val.as_integer() {
                     Some(integer) => bar.length = integer as uint,
@@ -633,7 +637,7 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
             bars.push(bar);
         },
         "volume" => {
-            let mut bar = box VolumeBar::new();
+            let mut bar = Box::new(VolumeBar::new());
             match toml.get(&"card".to_string()) {
                 Some(val) => match val.as_integer() {
                     Some(integer) => bar.card = integer as uint,
@@ -679,7 +683,7 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
         Some(map) => {
             let colormap = match map.as_slice() {
                 Some(slice) => slice,
-                None => panic!("Colormap must be array. Found {}.", toml),
+                None => panic!("Colormap must be array. Found {:?}.", toml),
             };
             let mut cmap = ColorMap::new();
             for pair in colormap.iter() {
@@ -696,7 +700,7 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &TomlTable) {
                 }
                 cmap.add_pair(map_array[0], Color::new(map_array[1], map_array[2], map_array[3]));
             }
-            bars[i].set_colormap(box cmap);
+            bars[i].set_colormap(Box::new(cmap));
         },
         None => (),
     };

@@ -17,9 +17,8 @@
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::timer;
+use std::old_io::{timer, pipe};
 use std::time::Duration;
-use std::io::pipe;
 
 /// A statusbar for testing colormaps.
 pub struct TestBar {
@@ -58,7 +57,7 @@ impl StatusBar for TestBar {
             }
             for i in range(0u, num_bars) {
                 let val = ((i as f32)/(num_bars as f32)*100.) as u8;
-                let string = format!("^fg({})^r({}x{})", self.cmap.map(val), each_wid, self.height);
+                let string = format!("^fg({:?})^r({}x{})", self.cmap.map(val), each_wid, self.height);
                 match stream.write_str(string.as_slice()) {
                     Err(msg) => println!("Trouble writing to test bar: {}", msg),
                     Ok(_) => (),

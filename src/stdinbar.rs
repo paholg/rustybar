@@ -19,8 +19,8 @@ extern crate time;
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::pipe;
-use std::io;
+use std::old_io::pipe;
+use std::old_io;
 
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 pub struct StdinBar {
@@ -45,7 +45,7 @@ impl StatusBar for StdinBar {
 
     fn run(&self, mut stream: Box<pipe::PipeStream>) {
         // -------------------
-        let mut stdin = io::stdio::stdin();
+        let mut stdin = old_io::stdio::stdin();
         loop {
             write_space(&mut *stream, self.lspace);
             let line = stdin.read_line();

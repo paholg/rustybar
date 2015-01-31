@@ -16,7 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 use colormap::{Color, ColorMap};
-use std::io::pipe;
+use std::old_io::pipe;
 
 // fixme: this should be settable
 static TEXTCOLOR: &'static str = "#888888";
@@ -39,7 +39,7 @@ pub fn write_one_bar(stream: &mut pipe::PipeStream, val: f32, color: Color, widt
     // fixme: .round()?
     let wfill = (val*(width as f32) + 0.5) as uint;
     let wempty = width - wfill;
-    match write!(stream, "^fg({0})^r({2}x{1})^ro({3}x{1})", color, height, wfill, wempty) {
+    match write!(stream, "^fg({0:?})^r({2}x{1})^ro({3}x{1})", color, height, wfill, wempty) {
         Err(msg) => panic!("Failed to write pipe: {}", msg.desc),
         Ok(_) => (),
     };

@@ -17,6 +17,7 @@
 
 use std::fmt;
 use std::num::FromStrRadix;
+use std::clone::Clone;
 
 /// An RGB triplet
 pub struct Color {
@@ -32,6 +33,7 @@ impl Color {
     }
 
     /// expects a color in the format "#ffffff"
+    // fixme: This should be part of the FromStr trait.
     pub fn from_str(color: &str) -> Color {
         assert!(color.len() == 7, "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
         let mut c = color.chars();
@@ -52,6 +54,12 @@ impl fmt::Show for Color {
     /// Color triplets will be printed in the form #ffffff
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b) }
+}
+
+impl Clone for Color {
+    fn clone(&self) -> Color {
+        Color::new(self.r, self.g, self.b)
+    }
 }
 
 /// A map that stores (value, color) pairs, which can be used to interpolate between

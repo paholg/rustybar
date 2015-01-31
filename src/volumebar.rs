@@ -18,8 +18,9 @@
 use statusbar::*;
 use colormap::{Color, ColorMap};
 use std::time::Duration;
-use std::io::{timer, pipe, Command};
+use std::old_io::{timer, pipe, Command};
 use std::string::String;
+use std::str::FromStr;
 
 /// A statusbar for volume information. Uses information from /sys/class/backlight/
 pub struct VolumeBar {
@@ -73,15 +74,15 @@ impl StatusBar for VolumeBar {
                 Some(val) => val,
                 None => panic!("Volume bar error. Couldn't find value."),
             };
-            let val: u8 = from_str(v.at(1)).unwrap();
+            let val: u8 = FromStr::from_str(v.at(1).unwrap()).unwrap();
             let mut cap = re_mute.captures_iter(output.as_slice());
             let state = match cap.nth(0) {
                 Some(val) => val,
                 None => panic!("Volume bar error. Couldn't find mute state."),
             };
-            let color = match state.at(1) {
+            let color = match state.at(1).unwrap() {
                 "on" => self.cmap.map(val),
-                "off" => self.mute_color,
+                "off" => self.mute_color.clone(),
                 _ => panic!("This can't happen"),
             };
             write_space(&mut *stream, self.lspace);

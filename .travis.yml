@@ -1,0 +1,6 @@
+language: rust
+
+notifications:
+  email:
+    recipients:
+      paho@paholg.com

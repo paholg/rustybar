@@ -4,12 +4,15 @@
 - Logging :: Send error output to log file
 - Config :: Clean up the interpretation code. I'm sure it wouldn't be that hard to make
             it a lot nicer. Look into functional ways to do this, like filter_map()
+- Memory :: Look into faster way to get info than regex (compare with parsing output from free at least)
+- Brightness :: Give path option in config
 
 # Dependencies
 dzen2 - bars
 amixer - sound
 xterm, xwininfo - char_width
 xrandr - resolution
+acpi - temperature
 
 # Features to add
 - Volume :: Use a sound library to be able to update in real time

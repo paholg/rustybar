@@ -1,20 +1,19 @@
 [package]
 
 name = "rustybar"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 
-[dependencies.inotify]
-git = "https://github.com/hannobraun/inotify-rs"
+[dependencies]
+  regex = "*"
+  regex_macros ="*"
+  toml = "*"
+  time = "*"
+  inotify = "*"
 
-[dependencies.xlib]
-git = "https://github.com/servo/rust-xlib"
 
-[dependencies.toml]
-git = "https://github.com/alexcrichton/toml-rs"
-
-[dependencies.time]
-git = "http://github.com/rust-lang/time"
+# [dependencies.xlib]
+# git = "https://github.com/servo/rust-xlib"
 
 # [dependencies.alsa]
 # git = "https://github.com/cyndis/rust-alsa"

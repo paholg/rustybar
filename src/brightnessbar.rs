@@ -19,13 +19,14 @@ extern crate libc;
 
 use statusbar::*;
 use colormap::ColorMap;
-use std::io::File;
-use std::io::fs::PathExtensions;
-use std::io::timer;
+use std::old_io::fs::PathExtensions;
+use std::old_io::{File, timer, pipe, fs};
 use std::time::Duration;
-use std::io::pipe;
-use std::io::fs;
+use std::str::FromStr;
 use inotify::ffi;
+use std::ffi::AsOsStr;
+
+// use std::ffi::CString;
 
 /// A statusbar for brightness information. Uses information from /sys/class/backlight/
 pub struct BrightnessBar {
@@ -68,7 +69,7 @@ impl StatusBar for BrightnessBar {
             let path_max = dirs[0].join("max_brightness");
             assert!(path_max.exists(), "The file {} doesn't exists. I can't make a brightness bar. Please report this.", path_max.display());
             let max_string = File::open(&path_max).read_to_string().unwrap();
-            self.max = from_str(max_string.trim().as_slice()).unwrap();
+            self.max = FromStr::from_str(max_string.trim().as_slice()).unwrap();
             //println!("max: {}", self.max);
         }
         else {
@@ -84,13 +85,13 @@ impl StatusBar for BrightnessBar {
             assert!(fd >= 0, "Invalid file descriptor in brightness bar.");
             // wd = ffi::inotify_add_watch(fd, self.path_cur.to_c_str().as_ptr(),
             //                                      ffi::IN_MODIFY);
-            ffi::inotify_add_watch(fd, self.path_cur.to_c_str().as_ptr(),
+            ffi::inotify_add_watch(fd, self.path_cur.as_str().unwrap().as_ptr() as *const i8,
                                    ffi::IN_MODIFY);
         }
-        let mut buffer = [0u8, ..1024];
+        let mut buffer = [0u8; 1024];
         loop {
             let cur_string = File::open(&self.path_cur).read_to_string().unwrap();
-            let cur: f32 = from_str(cur_string.trim().as_slice()).unwrap();
+            let cur: f32 = FromStr::from_str(cur_string.trim().as_slice()).unwrap();
             let val = cur/self.max;
             write_space(&mut *stream, self.lspace);
             match stream.write_str(
