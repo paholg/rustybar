@@ -50,7 +50,7 @@ impl Color {
     }
 }
 
-impl fmt::Show for Color {
+impl fmt::Debug for Color {
     /// Color triplets will be printed in the form #ffffff
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b) }
@@ -85,7 +85,7 @@ impl ColorMap {
     /// color.
     pub fn add_pair(&mut self, val: u8, color: Color) {
         assert!(val <= 100, "Value {} outside of range. Must be in [0,100].", val);
-        let mut i = 0u;
+        let mut i = 0u32;
         loop {
             if self.values[i] == val {
                 self.colors[i] = color;
@@ -105,7 +105,7 @@ impl ColorMap {
     /// in the range [0, 100].
     pub fn map(&self, val: u8) -> Color {
         assert!(val <= 100, "Tried to get a color using index {} (needs to be in [0,100]).", val);
-        let mut i = 1u;
+        let mut i = 1u32;
         while self.values[i] < val {
             i += 1;
         }

@@ -139,7 +139,7 @@ impl StatusBar for CpuBar {
             write_space(&mut *stream, self.lspace);
             write_sep(&mut *stream, 2*self.height);
             write_space(&mut *stream, self.space);
-            for i in range(0u, idles.len()) {
+            for i in 0..idles.len() {
                 let usage = 1.0 - ((idles[i] - old_idles[i]) as f32)/(dt.num_nanoseconds().unwrap() as f32)*1e7;
                 let val = if usage > 1.0 { 1.0 }
                           else if usage < 0.0 { 0.0 }

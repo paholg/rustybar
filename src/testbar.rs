@@ -55,7 +55,7 @@ impl StatusBar for TestBar {
                 let space = (self.width % 100)/2;
                 write_space(&mut *stream, space);
             }
-            for i in range(0u, num_bars) {
+            for i in 0..num_bars {
                 let val = ((i as f32)/(num_bars as f32)*100.) as u8;
                 let string = format!("^fg({:?})^r({}x{})", self.cmap.map(val), each_wid, self.height);
                 match stream.write_str(string.as_slice()) {

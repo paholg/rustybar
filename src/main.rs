@@ -17,9 +17,10 @@
 
 #![feature(int_uint)]
 #![feature(plugin)]
+#![plugin(regex_macros)]
 
-#[macro_use(regex)]
-#[plugin] extern crate regex_macros;
+// #[macro_use(regex)]
+extern crate regex_macros;
 extern crate regex;
 extern crate inotify;
 extern crate time;
@@ -152,26 +153,26 @@ fn main() {
         },
         None => "monospace-9".to_string(),
     };
-    let height: uint = match toml.get(&"height".to_string()) {
+    let height: u32 = match toml.get(&"height".to_string()) {
         Some(val) => match val.as_integer() {
             Some(integer) => integer as uint,
             None => panic!("Invalid key for height: {}", val),
         },
-        None => 18u,
+        None => 18,
     };
-    let lgap: uint = match toml.get(&"left_gap".to_string()) {
+    let lgap: u32 = match toml.get(&"left_gap".to_string()) {
         Some(val) => match val.as_integer() {
             Some(integer) => integer as uint,
             None => panic!("Invalid key for left_gap: {}", val),
         },
-        None => 18u,
+        None => 18,
     };
-    let rgap: uint = match toml.get(&"right_gap".to_string()) {
+    let rgap: u32 = match toml.get(&"right_gap".to_string()) {
         Some(val) => match val.as_integer() {
             Some(integer) => integer as uint,
             None => panic!("Invalid key for right_gap: {}", val),
         },
-        None => 18u,
+        None => 18,
     };
     let bg: &str = match toml.get(&"background".to_string()) {
         Some(name) => match name.as_str() {
@@ -218,13 +219,13 @@ fn main() {
     if center_filler_space.len() > 0 {
         panic!("Can't have filler space (designated by negative integers) in the center region.");
     }
-    let mut center_size = 0u;
+    let mut center_size = 0u32;
     for len in lengths.iter() {
         center_size += *len;
     }
     let center_bars_left = (res - center_size)/2;
     let center_bars_right = center_bars_left + center_size;
-    for i in range(0u, lefts.len()) {
+    for i in 0..lefts.len() {
         lefts[i] += center_bars_left;
     }
 
@@ -237,7 +238,7 @@ fn main() {
         lefts[i] += lgap;
     }
 
-    let mut lused = 0u;
+    let mut lused = 0u32;
     for len in lengths.iter().skip(first_left) {
         lused += *len;
     }
@@ -245,7 +246,7 @@ fn main() {
     if lfree < 0 {
         panic!("You have not left enough for the left bars. You need at least {} more pixels.", -lfree);
     }
-    let mut denom = 0u;
+    let mut denom = 0u32;
     for &(_, num) in left_filler_space.iter() {
         denom += num;
     }
@@ -268,7 +269,7 @@ fn main() {
     }
     // Now we'll re-find free space in case round-off errors or no filler space was selected
     // and add it all to the end
-    lused = 0u;
+    lused = 0;
     for len in lengths.iter().skip(first_left) {
         lused += *len;
     }
@@ -288,7 +289,7 @@ fn main() {
         lefts[i] += center_bars_right;
     }
 
-    let mut rused = 0u;
+    let mut rused = 0u32;
     for len in lengths.iter().skip(first_right) {
         rused += *len;
     }
@@ -296,7 +297,7 @@ fn main() {
     if rfree < 0 {
         panic!("You have not left enough for the right bars. You need at least {} more pixels.", -rfree);
     }
-    let mut denom = 0u;
+    let mut denom = 0u32;
     for &(_, num) in right_filler_space.iter() {
         denom += num;
     }
@@ -319,7 +320,7 @@ fn main() {
     }
     // Now we'll re-find free space in case round-off errors or no filler space was selected
     // and add it all to the beginning
-    rused = 0u;
+    rused = 0;
     for len in lengths.iter().skip(first_right) {
         rused += *len;
     }
@@ -336,7 +337,7 @@ fn main() {
     // start all the bars ----------------------------------------------------------------
     let mut bar_processes: Vec<process::Process> = Vec::new();
     let mut streams: Vec<Box<pipe::PipeStream>> = Vec::new();
-    for i in range(0u, bars.len()) {
+    for i in 0..bars.len() {
         let mut process = match Command::new("dzen2").args(&[
             "-fn",
             font.as_slice(),
@@ -396,7 +397,7 @@ fn main() {
 
 fn print_usage(program: &str, _opts: &[OptGroup]) {
     println!("Usage: {} [OPTIONS]", program);
-    let width = 10u;
+    let width = 10u32;
     for opt in _opts.iter() {
         let len = opt.long_name.len() + opt.hint.len();
         let num = if len > width { 0 }
@@ -490,8 +491,8 @@ fn textw(font: &str) -> uint {
 fn extract_bars_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, lefts: &mut Vec<uint>,
                           lengths: &mut Vec<uint>, filler_space: &mut Vec<(uint, uint)>,
                           toml: &[toml::Value], char_width: uint) {
-    let mut coord = 0u;
-    let mut lspace = 0u;
+    let mut coord = 0u32;
+    let mut lspace = 0u32;
     let mut space: uint;
     let mut first_bar = true;
     for item in toml.iter() {
@@ -531,7 +532,7 @@ fn extract_bars_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, lefts: &mut Vec<u
             let i = bars.len() - 1;
             if first_bar {
                 bars[i].set_lspace(lspace);
-                lspace = 0u;
+                lspace = 0;
                 first_bar = false;
             }
             bars[i].initialize(char_width);
@@ -692,7 +693,7 @@ fn add_bar_from_toml(bars: &mut Vec<Box<StatusBar+Send>>, toml: &Table) {
                     _ => panic!("Each colormap entry must be in the form [key, red, green, blue]."),
                 };
                 let mut map_array = [0u8, 0, 0, 0];
-                for i in range(0u, map_array.len()) {
+                for i in 0..map_array.len() {
                     map_array[i] = match array[i].as_integer() {
                         Some(num) if num >= 0 && num <= 255 => num as u8,
                         _ => panic!("The entries in a colormap must be numbers in the range [0,255]."),
