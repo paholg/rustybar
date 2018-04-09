@@ -110,7 +110,7 @@ impl StatusBar for Battery {
                 "Charging" => "^fg(#00ff00)+",
                 "Discharging" => "^fg(#ff0000)-",
                 "Full" => " ",
-                _ => "^fg(#ff0000)*",
+                _ => "^fg(#00ffff)*",
             };
             w.write(status.as_bytes())?;
             write_space(w, self.rspace)?;

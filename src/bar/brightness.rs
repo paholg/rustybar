@@ -2,7 +2,7 @@ use colormap::{ColorMap, ColorMapConfig};
 
 use inotify;
 use failure;
-use std::{fs, path, process, thread, time, io::Read, io::Write};
+use std::{fs, path, process, io::Read, io::Write};
 
 use bar::{write_one_bar, write_space, StatusBar};
 
@@ -104,8 +104,6 @@ impl StatusBar for Brightness {
             perform()?;
             inotify.read_events_blocking(&mut buffer)?.next();
         }
-
-        Ok(())
     }
 
     fn len(&self) -> u32 {

@@ -63,11 +63,11 @@ fn run() -> Result<(), failure::Error> {
     let bg = config.background;
 
     // TODO: THIS IS TMEPOERERXS
-    let bgs = vec![
-        "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff0000", "#00ff00",
-        "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
-    ];
-    let mut bg_iter = bgs.iter();
+    // let bgs = vec![
+    //     "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff0000", "#00ff00",
+    //     "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
+    // ];
+    // let mut bg_iter = bgs.iter();
 
     let char_width = char_width(&font);
 
