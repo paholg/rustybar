@@ -1,25 +1,9 @@
-// rustybar - a lightweight but featureful status bar
-// Copyright (C) 2014  Paho Lurie-Gregg
-
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+use failure;
 
 use std::fmt;
-use std::num::FromStrRadix;
-use std::clone::Clone;
 
 /// An RGB triplet
+#[derive(Copy, Clone, Debug, Deserialize)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -29,36 +13,50 @@ pub struct Color {
 impl Color {
     /// creates a Color object, guaranteeing that the colors are acceptable values.
     pub fn new(red: u8, green: u8, blue: u8) -> Color {
-        Color{r: red, g: green, b: blue}
+        Color {
+            r: red,
+            g: green,
+            b: blue,
+        }
     }
 
-    /// expects a color in the format "#ffffff"
-    // fixme: This should be part of the FromStr trait.
-    pub fn from_str(color: &str) -> Color {
-        assert!(color.len() == 7, "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
-        let mut c = color.chars();
-        let hash = c.nth(0).unwrap();
-        assert!(hash == '#', "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
-        let num: u32 = match FromStrRadix::from_str_radix(color.slice(1,7), 16) {
-            Some(val) => val,
-            None => panic!("Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color),
-        };
-        let red = num >> 16;
-        let green = (num >> 8) & 255;
-        let blue = num & 255;
-        Color{r: red as u8, g: green as u8, b: blue as u8}
-    }
+    // /// expects a color in the format "#ffffff"
+    // // fixme: This should be part of the FromStr trait.
+    // pub fn from_str(color: &str) -> Color {
+    //     assert!(color.len() == 7, "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
+    //     let mut c = color.chars();
+    //     let hash = c.nth(0).unwrap();
+    //     assert!(hash == '#', "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
+    //     let num = u32::from_str_radix(&color[1..7], 16).unwrap();
+    //     let red = num >> 16;
+    //     let green = (num >> 8) & 255;
+    //     let blue = num & 255;
+    //     Color {
+    //         r: red as u8,
+    //         g: green as u8,
+    //         b: blue as u8,
+    //     }
+    // }
 }
 
-impl fmt::Debug for Color {
+impl fmt::Display for Color {
     /// Color triplets will be printed in the form #ffffff
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b) }
+        write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
+    }
 }
 
-impl Clone for Color {
-    fn clone(&self) -> Color {
-        Color::new(self.r, self.g, self.b)
+#[derive(Debug, Deserialize)]
+pub struct ColorMapConfig(Vec<Vec<u8>>);
+
+impl ::std::default::Default for ColorMapConfig {
+    /// A default ColorMap that goes from red to yellow to green.
+    fn default() -> Self {
+        ColorMapConfig(vec![
+            vec![0, 255, 0, 0],
+            vec![35, 255, 255, 0],
+            vec![100, 0, 255, 0],
+        ])
     }
 }
 
@@ -67,66 +65,91 @@ impl Clone for Color {
 ///
 /// # Example
 /// fixme: add example
-
+#[derive(Clone, Debug)]
 pub struct ColorMap {
     colors: Vec<Color>,
     values: Vec<u8>,
 }
 
 impl ColorMap {
-    /// Creates a new colormap. To start, it maps 0 to black and 100 to white, but these
-    /// values are changeable.
-    pub fn new() -> ColorMap {
-        ColorMap{colors: vec![Color::new(0, 0, 0), Color::new(255, 255, 255)], values: vec![0, 100]}
+    // /// Creates a new colormap. To start, it maps 0 to black and 100 to white, but these
+    // /// values are changeable.
+    // pub fn new() -> ColorMap {
+    //     ColorMap {
+    //         colors: vec![Color::new(0, 0, 0), Color::new(255, 255, 255)],
+    //         values: vec![0, 100],
+    //     }
+    // }
+
+    pub fn from_config(config: &ColorMapConfig) -> Result<ColorMap, failure::Error> {
+        if !config.0.iter().all(|v| v.len() == 4) {
+            bail!("Invalid colormap. Each row must have four values");
+        }
+        if let Some(v) = config.0.iter().find(|v| v[0] > 100) {
+            bail!("Invalid colormap. Value {} must be in range [0, 100]", v[0]);
+        }
+
+        let values = config.0.iter().map(|v| v[0]).collect();
+        let colors = config
+            .0
+            .iter()
+            .map(|v| Color::new(v[1], v[2], v[3]))
+            .collect();
+
+        Ok(ColorMap { values, colors })
     }
 
-    /// Adds a (value, color) pair to the colormap. Value must be in the range
-    /// [0,100]. If the value already exists, then it will override the corresponding
-    /// color.
-    pub fn add_pair(&mut self, val: u8, color: Color) {
-        assert!(val <= 100, "Value {} outside of range. Must be in [0,100].", val);
-        let mut i = 0u32;
-        loop {
-            if self.values[i] == val {
-                self.colors[i] = color;
-                break;
-            }
-            else if self.values[i] > val {
-                self.values.insert(i, val);
-                self.colors.insert(i, color);
-                break;
-            }
-            i += 1;
-        }
-    }
+    // /// Adds a (value, color) pair to the colormap. Value must be in the range
+    // /// [0,100]. If the value already exists, then it will override the corresponding
+    // /// color.
+    // pub fn add_pair(&mut self, val: u8, color: Color) {
+    //     assert!(
+    //         val <= 100,
+    //         "Value {} outside of range. Must be in [0,100].",
+    //         val
+    //     );
+    //     let mut i = 0;
+    //     loop {
+    //         if self.values[i] == val {
+    //             self.colors[i] = color;
+    //             break;
+    //         } else if self.values[i] > val {
+    //             self.values.insert(i, val);
+    //             self.colors.insert(i, color);
+    //             break;
+    //         }
+    //         i += 1;
+    //     }
+    // }
 
     /// This does the interpolation, and gives you the color corresponding to the value
     /// called with, as dicated by the color map. Should throw an error if index is not
     /// in the range [0, 100].
     pub fn map(&self, val: u8) -> Color {
-        assert!(val <= 100, "Tried to get a color using index {} (needs to be in [0,100]).", val);
-        let mut i = 1u32;
+        assert!(
+            val <= 100,
+            "Tried to get a color using index {} (needs to be in [0,100]).",
+            val
+        );
+        let mut i = 1;
         while self.values[i] < val {
             i += 1;
         }
-        let lower: f32 = ((self.values[i] - val) as f32)/((self.values[i] - self.values[i-1]) as f32);
-        let upper: f32 = ((val - self.values[i-1]) as f32)/((self.values[i] - self.values[i-1]) as f32);
+        let lower: f32 =
+            ((self.values[i] - val) as f32) / ((self.values[i] - self.values[i - 1]) as f32);
+        let upper: f32 =
+            ((val - self.values[i - 1]) as f32) / ((self.values[i] - self.values[i - 1]) as f32);
 
-        let red: u8 = (lower*(self.colors[i-1].r as f32) + upper*(self.colors[i].r as f32)) as u8;
-        let green: u8 = (lower*(self.colors[i-1].g as f32) + upper*(self.colors[i].g as f32)) as u8;
-        let blue: u8 = (lower*(self.colors[i-1].b as f32) + upper*(self.colors[i].b as f32)) as u8;
-        Color{r: red, g: green, b: blue}
+        let red: u8 =
+            (lower * (self.colors[i - 1].r as f32) + upper * (self.colors[i].r as f32)) as u8;
+        let green: u8 =
+            (lower * (self.colors[i - 1].g as f32) + upper * (self.colors[i].g as f32)) as u8;
+        let blue: u8 =
+            (lower * (self.colors[i - 1].b as f32) + upper * (self.colors[i].b as f32)) as u8;
+        Color {
+            r: red,
+            g: green,
+            b: blue,
+        }
     }
-
-    // fixme: add show?
-    // fixme: we should have a way to to remove elements
 }
-// impl Clone for ColorMap {
-//     fn clone(&self) -> ColorMap {
-//         let c: Vec<Color> = Vec::new();
-//         //c.push_all(self.colors.clone());
-//         let v: Vec<u8> = Vec::new();
-//         self.values.clone() + 3;
-//         ColorMap{colors: c, values: v}
-//     }
-// }

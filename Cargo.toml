@@ -1,19 +1,15 @@
 [package]
-
-name = "rustybar"
-version = "0.1.2"
-authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
+  name = "rustybar"
+  version = "0.1.2"
+  authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 
 [dependencies]
-  regex = "*"
-  regex_macros ="*"
-  toml = "*"
-  time = "*"
+  directories = "*"
+  failure = "*"
   inotify = "*"
-
-
-# [dependencies.xlib]
-# git = "https://github.com/servo/rust-xlib"
-
-# [dependencies.alsa]
-# git = "https://github.com/cyndis/rust-alsa"
+  regex = "*"
+  chrono = "*"
+  toml = "*"
+  serde = "*"
+  serde_derive = "*"
+  structopt = "*"

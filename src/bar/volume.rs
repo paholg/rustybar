@@ -18,7 +18,7 @@
 use statusbar::*;
 use colormap::{Color, ColorMap};
 use std::time::Duration;
-use std::old_io::{timer, pipe, Command};
+use std::old_io::{pipe, timer, Command};
 use std::string::String;
 use std::str::FromStr;
 
@@ -53,14 +53,18 @@ impl StatusBar for VolumeBar {
         char_width + 1;
     }
     fn run(&self, mut stream: Box<pipe::PipeStream>) {
-        let re_vol = regex!(r"Playback.*\[(\d+)%\]");
-        let re_mute = regex!(r"Playback.*\[(on|off)\]\s*$");
+        let re_vol = regex::Regex::new(r"Playback.*\[(\d+)%\]").unwrap();
+        let re_mute = regex::Regex::new(r"Playback.*\[(on|off)\]\s*$").unwrap();
         loop {
-            let info = match Command::new("amixer").args(&[
-                "-c",
-                self.card.to_string().as_slice(),
-                "sget",
-                self.channel.as_slice()]).output() {
+            let info = match Command::new("amixer")
+                .args(&[
+                    "-c",
+                    self.card.to_string().as_slice(),
+                    "sget",
+                    self.channel.as_slice(),
+                ])
+                .output()
+            {
                 Ok(out) => out,
                 Err(msg) => panic!("Failed to run amixer with message: {}", msg),
             };
@@ -90,7 +94,13 @@ impl StatusBar for VolumeBar {
                 Err(msg) => println!("Trouble writing to volume bar: {}", msg),
                 Ok(_) => (),
             };
-            write_one_bar(&mut *stream, (val as f32)/100., color, self.width, self.height);
+            write_one_bar(
+                &mut *stream,
+                (val as f32) / 100.,
+                color,
+                self.width,
+                self.height,
+            );
             match stream.write_str("^ca()^ca()^ca()\n") {
                 Err(msg) => println!("Trouble writing to volume bar: {}", msg),
                 Ok(_) => (),
@@ -104,9 +114,16 @@ impl StatusBar for VolumeBar {
     fn len(&self) -> uint {
         self.lspace + self.width
     }
-    fn get_lspace(&self) -> uint { self.lspace }
-    fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
-    fn set_width(&mut self, width: uint) { self.width = width }
-    fn set_height(&mut self, height: uint) { self.height = height }
+    fn get_lspace(&self) -> uint {
+        self.lspace
+    }
+    fn set_lspace(&mut self, lspace: uint) {
+        self.lspace = lspace
+    }
+    fn set_width(&mut self, width: uint) {
+        self.width = width
+    }
+    fn set_height(&mut self, height: uint) {
+        self.height = height
+    }
 }
-
