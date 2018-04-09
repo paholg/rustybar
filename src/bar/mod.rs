@@ -2,12 +2,12 @@ mod battery;
 mod clock;
 mod cpu;
 mod cpu_temp;
-// mod memory;
+mod memory;
 mod stdin;
 
 pub use self::{battery::{Battery, BatteryConfig}, clock::{Clock, ClockConfig},
                cpu::{Cpu, CpuConfig}, cpu_temp::{CpuTemp, CpuTempConfig},
-               stdin::{Stdin, StdinConfig}};
+               memory::{Memory, MemoryConfig}, stdin::{Stdin, StdinConfig}};
 
 use std::{fmt, marker, process, io::Write};
 use failure;
@@ -34,7 +34,7 @@ pub enum BarConfig {
     clock(ClockConfig),
     cpu(CpuConfig),
     cputemp(CpuTempConfig),
-    // memory(MemoryConfig),
+    memory(MemoryConfig),
     stdin(StdinConfig),
 }
 
@@ -45,7 +45,7 @@ impl BarConfig {
             &BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),
             &BarConfig::cpu(ref b) => Box::new(Cpu::from_config(&b, char_width)?),
             &BarConfig::cputemp(ref b) => Box::new(CpuTemp::from_config(&b, char_width)?),
-            // &BarConfig::memory(ref b) => Box::new(Memory::from_config(&b, char_width)?),
+            &BarConfig::memory(ref b) => Box::new(Memory::from_config(&b, char_width)?),
             &BarConfig::stdin(ref b) => Box::new(Stdin::from_config(&b, char_width)?),
         };
 

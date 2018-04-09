@@ -63,12 +63,12 @@ fn run() -> Result<(), failure::Error> {
     let bg = config.background;
 
     // TODO: THIS IS TMEPOERERXS
-    // let bgs = vec![
-    //     "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff"
-    // ];
-    // let mut bg_iter = bgs.iter();
+    let bgs = vec![
+        "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff0000", "#00ff00",
+        "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
+    ];
+    let mut bg_iter = bgs.iter();
 
-    // fixme: this is broken
     let char_width = char_width(&font);
 
     let bars = {
@@ -84,9 +84,6 @@ fn run() -> Result<(), failure::Error> {
         left
     };
 
-    // start all the bars ----------------------------------------------------------------
-    // let mut bar_processes: Vec<process::Process> = Vec::new();
-    // let mut streams: Vec<Box<pipe::PipeStream>> = Vec::new();
     let mut threads = Vec::new();
     let mut left = 0;
     for bar in bars {
@@ -95,7 +92,8 @@ fn run() -> Result<(), failure::Error> {
         {
             let font = font.clone();
             let left = left.clone();
-            let bg = bg.clone(); //bg_iter.next().unwrap().clone();
+            let bg = bg.clone();
+            // let bg = bg_iter.next().unwrap().clone();
             let handler = thread::spawn(move || {
                 let process = process::Command::new("dzen2")
                     .args(&[

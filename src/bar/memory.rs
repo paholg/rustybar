@@ -1,89 +1,125 @@
 use colormap::{ColorMap, ColorMapConfig};
-use std::old_io::File;
-use std::old_io::fs::PathExtensions;
-use std::old_io::timer;
-use std::time::Duration;
-use std::old_io::pipe;
+
+use failure;
+use regex;
+use std::{fs, path, process, thread, time, io::Read, io::Write};
+
+use bar::{write_one_bar, write_space, StatusBar};
+
+#[derive(Debug, Deserialize)]
+pub struct MemoryConfig {
+    #[serde(default)]
+    colormap: ColorMapConfig,
+    width: u32,
+    height: u32,
+}
 
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
-pub struct MemoryBar {
+#[derive(Debug)]
+pub struct Memory {
     cmap: ColorMap,
-    pub width: uint,
-    pub height: uint,
-    lspace: uint,
+    width: u32,
+    height: u32,
+    lspace: u32,
+    rspace: u32,
 }
 
-impl MemoryBar {
-    pub fn new() -> MemoryBar {
-        MemoryBar {
-            width: 20,
-            height: 10,
+impl Memory {
+    pub fn from_config(config: &MemoryConfig, _char_width: u32) -> Result<Memory, failure::Error> {
+        Ok(Memory {
+            cmap: ColorMap::from_config(&config.colormap)?,
+            width: config.width,
+            height: config.height,
             lspace: 0,
-            cmap: ColorMap::new(),
-        }
+            rspace: 0,
+        })
     }
 }
 
-impl StatusBar for MemoryBar {
-    fn initialize(&mut self, char_width: uint) {
-        // just so it doesn't warn us about char_width being unused
-        char_width + 1;
-    }
-
-    fn run(&self, mut stream: Box<pipe::PipeStream>) {
-        let path = Path::new("/proc/meminfo");
+impl StatusBar for Memory {
+    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
+        let path = path::Path::new("/proc/meminfo");
         if !path.is_file() {
-            panic!("The file {} does not exist. You cannot use the cpu bar without it. Are you sure you're running GNU/Linux?", path.display());
+            bail!(
+                "The file {} does not exist. You cannot use the cpu bar without it. Are you sure you're running GNU/Linux?",
+                path.display()
+            );
         }
-        let re_tot = regex::Regex::new(r"MemTotal.*?(\d+)").unwrap();
-        let re_free = regex::Regex::new(r"MemFree.*?(\d+)").unwrap();
-        let re_buffers = regex::Regex::new(r"Buffers.*?(\d+)").unwrap();
-        let re_cached = regex::Regex::new(r"Cached.*?(\d+)").unwrap();
-        let info = File::open(&path).read_to_string().unwrap();
-        // fixme: need to redo with new syntax
-        let total: f32 = 1.0; //re_tot.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
-                              // -------------------
+        let re_tot = regex::Regex::new(r"MemTotal.*?(\d+)")?;
+        let re_free = regex::Regex::new(r"MemFree.*?(\d+)")?;
+        let re_buffers = regex::Regex::new(r"Buffers.*?(\d+)")?;
+        let re_cached = regex::Regex::new(r"Cached.*?(\d+)")?;
+        let info = {
+            let mut buffer = String::new();
+            fs::File::open(&path)?.read_to_string(&mut buffer)?;
+            buffer
+        };
+
+        // let total: f32 = 1.0;
+        let total: f32 = re_tot
+            .captures(&info)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .parse()?;
+
         loop {
-            let info = File::open(&path).read_to_string().unwrap();
-            let free: f32 = 0.0; //re_free.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
-            let buffers: f32 = 0.0; //re_buffers.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
-            let cached: f32 = 0.0; //re_cached.captures_iter(info.as_slice().from_str().nth(0).unwrap().at(1)).unwrap();
+            let info = {
+                let mut buffer = String::new();
+                fs::File::open(&path)?.read_to_string(&mut buffer)?;
+                buffer
+            };
+            let free: f32 = re_free
+                .captures(&info)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()?;
+            let buffers: f32 = re_buffers
+                .captures(&info)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()?;
+            let cached: f32 = re_cached
+                .captures(&info)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()?;
             let val = (total - free - buffers - cached) / total;
 
-            write_space(&mut *stream, self.lspace);
+            write_space(w, self.lspace)?;
             write_one_bar(
-                &mut *stream,
+                w,
                 val,
                 self.cmap.map((val * 100.) as u8),
                 self.width,
                 self.height,
-            );
-            match stream.write_str("\n") {
-                Err(msg) => println!("Trouble writing to memory bar: {}", msg),
-                Ok(_) => (),
-            }
+            )?;
+            write_space(w, self.rspace)?;
+            w.write(b"\n")?;
 
-            timer::sleep(Duration::seconds(1));
+            thread::sleep(time::Duration::from_secs(1));
         }
     }
-
-    fn set_colormap(&mut self, cmap: Box<ColorMap>) {
-        self.cmap = *cmap;
+    fn len(&self) -> u32 {
+        self.lspace + self.width + self.rspace
     }
 
-    fn len(&self) -> uint {
-        self.lspace + self.width
-    }
-    fn get_lspace(&self) -> uint {
+    fn get_lspace(&self) -> u32 {
         self.lspace
     }
-    fn set_lspace(&mut self, lspace: uint) {
+
+    fn set_lspace(&mut self, lspace: u32) {
         self.lspace = lspace
     }
-    fn set_width(&mut self, width: uint) {
-        self.width = width
-    }
-    fn set_height(&mut self, height: uint) {
-        self.height = height
+
+    fn set_rspace(&mut self, rspace: u32) {
+        self.rspace = rspace
     }
 }
