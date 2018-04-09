@@ -22,7 +22,7 @@ use std::old_io::{pipe, timer, Command};
 use std::string::String;
 use std::str::FromStr;
 
-/// A statusbar for volume information. Uses information from /sys/class/backlight/
+/// A statusbar for volume information.
 pub struct VolumeBar {
     pub card: uint,
     pub channel: String,

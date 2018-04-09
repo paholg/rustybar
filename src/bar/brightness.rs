@@ -1,132 +1,126 @@
-use colormap::ColorMap;
+use colormap::{ColorMap, ColorMapConfig};
 
-use std::str::FromStr;
+use inotify;
+use failure;
+use std::{fs, path, process, thread, time, io::Read, io::Write};
 
-use inotify::ffi;
+use bar::{write_one_bar, write_space, StatusBar};
 
-// use std::ffi::CString;
+#[derive(Debug, Deserialize)]
+pub struct BrightnessConfig {
+    #[serde(default)]
+    colormap: ColorMapConfig,
+    width: u32,
+    height: u32,
+}
 
 /// A statusbar for brightness information. Uses information from /sys/class/backlight/
-pub struct BrightnessBar {
-    path_cur: Path,
+#[derive(Debug)]
+pub struct Brightness {
+    path_current: path::PathBuf,
     max: f32,
     cmap: ColorMap,
-    pub width: uint,
-    pub height: uint,
-    pub lspace: uint,
+    width: u32,
+    height: u32,
+    lspace: u32,
+    rspace: u32,
 }
 
-impl BrightnessBar {
-    pub fn new() -> BrightnessBar {
-        BrightnessBar {
-            path_cur: Path::new("/"),
-            max: 0.,
-            cmap: ColorMap::new(),
-            width: 30,
-            height: 10,
+impl Brightness {
+    pub fn from_config(
+        config: &BrightnessConfig,
+        _char_width: u32,
+    ) -> Result<Brightness, failure::Error> {
+        let base_path = path::Path::new("/sys/class/backlight");
+
+        if !base_path.is_dir() {
+            bail!("The directory: {} doesn't exist. The brightness bar won't work.");
+        }
+
+        let mut dirs = fs::read_dir(&base_path)?;
+        // if dirs.cloned().count() > 1 {
+        //     println!("You have multiple backlight directories. They are:");
+        //     for dir in dirs {
+        //         println!("\t{}", dir?.path().display());
+        //     }
+        //     println!("I am going to use the first one. To use another, edit the configuration file (Not yet enabled.).");
+        // }
+        let path = dirs.next().unwrap()?.path();
+        let path_current = path.join("brightness");
+        let path_max = path.join("max_brightness");
+
+        let max_string = {
+            let mut buffer = String::new();
+            fs::File::open(&path_max)?.read_to_string(&mut buffer)?;
+            buffer
+        };
+
+        let max: f32 = max_string.trim().parse()?;
+
+        Ok(Brightness {
+            path_current: path_current,
+            max: max,
+            cmap: ColorMap::from_config(&config.colormap)?,
+            width: config.width,
+            height: config.height,
             lspace: 0,
-        }
+            rspace: 0,
+        })
     }
 }
 
-impl StatusBar for BrightnessBar {
-    fn initialize(&mut self, char_width: uint) {
-        // just so it doesn't warn us about char_width being unused
-        char_width + 1;
-        let path = Path::new("/sys/class/backlight");
-        if path.is_dir() {
-            let dirs = fs::readdir(&path).unwrap();
-            if dirs.len() > 1 {
-                println!("You have multiple backlight directories. They are:");
-                for dir in dirs.iter() {
-                    println!("\t{}", dir.display());
-                }
-                // fixme: add this to config
-                println!("I am going to use the first one. To use another, edit the configuration file (Not yet enabled, please report this and I will enable it).");
-            }
-            self.path_cur = dirs[0].join("brightness");
-            assert!(
-                self.path_cur.exists(),
-                "The file {} doesn't exists. I can't make a brightness bar. Please report this.",
-                self.path_cur.display()
-            );
-            let path_max = dirs[0].join("max_brightness");
-            assert!(
-                path_max.exists(),
-                "The file {} doesn't exists. I can't make a brightness bar. Please report this.",
-                path_max.display()
-            );
-            let max_string = File::open(&path_max).read_to_string().unwrap();
-            self.max = FromStr::from_str(max_string.trim().as_slice()).unwrap();
-        //println!("max: {}", self.max);
-        } else {
-            panic!("The directory: {} doesn't exist. The brightness bar won't work.");
-        }
-    }
-    fn run(&self, mut stream: Box<pipe::PipeStream>) {
-        let mut fd: i32;
-        //let mut wd: i32;
+impl StatusBar for Brightness {
+    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
+        let mut inotify = inotify::Inotify::init()?;
+        inotify.add_watch(&self.path_current, inotify::WatchMask::MODIFY)?;
 
-        unsafe {
-            fd = ffi::inotify_init();
-            assert!(fd >= 0, "Invalid file descriptor in brightness bar.");
-            // wd = ffi::inotify_add_watch(fd, self.path_cur.to_c_str().as_ptr(),
-            //                                      ffi::IN_MODIFY);
-            ffi::inotify_add_watch(
-                fd,
-                self.path_cur.as_str().unwrap().as_ptr() as *const i8,
-                ffi::IN_MODIFY,
-            );
-        }
-        let mut buffer = [0u8; 1024];
-        loop {
-            let cur_string = File::open(&self.path_cur).read_to_string().unwrap();
-            let cur: f32 = FromStr::from_str(cur_string.trim().as_slice()).unwrap();
-            let val = cur / self.max;
-            write_space(&mut *stream, self.lspace);
-            match stream.write_str(
-                "^ca(4,xdotool key XF86MonBrightnessUp)^ca(5,xdotool key XF86MonBrightnessDown)",
-            ) {
-                Err(msg) => println!("Trouble writing to brightness bar: {}", msg),
-                Ok(_) => (),
-            }
+        let mut perform = || -> Result<(), failure::Error> {
+            let current_string = {
+                let mut buffer = String::new();
+                fs::File::open(&self.path_current)?.read_to_string(&mut buffer)?;
+                buffer
+            };
+            let current: f32 = current_string.trim().parse()?;
+            let val = current / self.max;
+
+            write_space(w, self.lspace)?;
+            w.write(
+                b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)",
+            )?;
             write_one_bar(
-                &mut *stream,
+                w,
                 val,
                 self.cmap.map((val * 100.) as u8),
                 self.width,
                 self.height,
-            );
-            match stream.write_str("^ca()^ca()\n") {
-                Err(msg) => println!("Trouble writing to brightness bar: {}", msg),
-                Ok(_) => (),
-            }
-            timer::sleep(Duration::milliseconds(30));
-            unsafe {
-                ffi::read(
-                    fd,
-                    buffer.as_mut_ptr() as *mut libc::c_void,
-                    buffer.len() as u64,
-                );
-            }
+            )?;
+            w.write(b"^ca()^ca()\n")?;
+            write_space(w, self.rspace)?;
+            Ok(())
+        };
+
+        let mut buffer = [0; 1024];
+        loop {
+            perform()?;
+            inotify.read_events_blocking(&mut buffer)?.next();
         }
+
+        Ok(())
     }
-    fn set_colormap(&mut self, cmap: Box<ColorMap>) {
-        self.cmap = *cmap;
+
+    fn len(&self) -> u32 {
+        self.lspace + self.width + self.rspace
     }
-    fn len(&self) -> uint {
-        self.lspace + self.width
-    }
-    fn get_lspace(&self) -> uint {
+
+    fn get_lspace(&self) -> u32 {
         self.lspace
     }
-    fn set_lspace(&mut self, lspace: uint) {
+
+    fn set_lspace(&mut self, lspace: u32) {
         self.lspace = lspace
     }
-    fn set_width(&mut self, width: uint) {
-        self.width = width
-    }
-    fn set_height(&mut self, height: uint) {
-        self.height = height
+
+    fn set_rspace(&mut self, rspace: u32) {
+        self.rspace = rspace
     }
 }

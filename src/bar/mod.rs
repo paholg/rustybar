@@ -1,13 +1,15 @@
 mod battery;
+mod brightness;
 mod clock;
 mod cpu;
 mod cpu_temp;
 mod memory;
 mod stdin;
 
-pub use self::{battery::{Battery, BatteryConfig}, clock::{Clock, ClockConfig},
-               cpu::{Cpu, CpuConfig}, cpu_temp::{CpuTemp, CpuTempConfig},
-               memory::{Memory, MemoryConfig}, stdin::{Stdin, StdinConfig}};
+pub use self::{battery::{Battery, BatteryConfig}, brightness::{Brightness, BrightnessConfig},
+               clock::{Clock, ClockConfig}, cpu::{Cpu, CpuConfig},
+               cpu_temp::{CpuTemp, CpuTempConfig}, memory::{Memory, MemoryConfig},
+               stdin::{Stdin, StdinConfig}};
 
 use std::{fmt, marker, process, io::Write};
 use failure;
@@ -31,6 +33,7 @@ pub trait StatusBar: fmt::Debug + marker::Send + marker::Sync {
 #[allow(non_camel_case_types)]
 pub enum BarConfig {
     battery(BatteryConfig),
+    brightness(BrightnessConfig),
     clock(ClockConfig),
     cpu(CpuConfig),
     cputemp(CpuTempConfig),
@@ -42,6 +45,7 @@ impl BarConfig {
     pub fn into_bar(&self, char_width: u32) -> Result<Box<StatusBar>, failure::Error> {
         let bar: Box<StatusBar> = match self {
             &BarConfig::battery(ref b) => Box::new(Battery::from_config(&b, char_width)?),
+            &BarConfig::brightness(ref b) => Box::new(Brightness::from_config(&b, char_width)?),
             &BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),
             &BarConfig::cpu(ref b) => Box::new(Cpu::from_config(&b, char_width)?),
             &BarConfig::cputemp(ref b) => Box::new(CpuTemp::from_config(&b, char_width)?),
