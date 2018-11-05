@@ -1,11 +1,10 @@
+use bar::{Bar, WriteBar, Writer};
 use colormap::{ColorMap, ColorMapConfig};
-use std::string::String;
-use std::{process, io::Write, time::Duration};
-
 use failure;
+use lazy_static;
 use regex;
-
-use bar::{write_one_bar, write_space, StatusBar};
+use std::string::String;
+use std::{io::Write, process, time::Duration};
 
 #[derive(Debug, Deserialize)]
 pub struct CpuTempConfig {
@@ -24,8 +23,6 @@ pub struct CpuTemp {
     pub max: f32,
     pub width: u32,
     pub height: u32,
-    lspace: u32,
-    rspace: u32,
 }
 
 impl CpuTemp {
@@ -39,64 +36,48 @@ impl CpuTemp {
             width: config.width,
             height: config.height,
             cmap: ColorMap::from_config(&config.colormap)?,
-            lspace: 0,
-            rspace: 0,
         })
     }
 }
 
-impl StatusBar for CpuTemp {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-        let re = regex::Regex::new(r"(\d+\.\d+)\s*degrees.*")?;
-        loop {
-            let info = process::Command::new("acpi").arg("-t").output()?;
-            if !info.status.success() {
-                bail!(
-                    "\"acpi -t\" returned exit signal {}. Error: {}",
-                    info.status,
-                    String::from_utf8(info.stderr)?,
-                );
-            }
-            let output = String::from_utf8(info.stdout)?;
-            let temp: f32 = re.captures(&output)
-                .and_then(|c| c.get(1))
-                .unwrap()
-                .as_str()
-                .parse()?;
-            let val: f32 = if temp > self.max {
-                1.0
-            } else if temp < self.min {
-                0.0
-            } else {
-                (temp - self.min) / (self.max - self.min)
-            };
-            write_space(w, self.lspace)?;
-            write_one_bar(
-                w,
-                val,
-                self.cmap.map((val * 100.) as u8),
-                self.width,
-                self.height,
-            )?;
-            write_space(w, self.rspace)?;
-            w.write(b"\n")?;
-            ::std::thread::sleep(Duration::from_secs(1));
-        }
-    }
-
+impl Bar for CpuTemp {
     fn len(&self) -> u32 {
-        self.lspace + self.width + self.rspace
+        self.width
     }
 
-    fn get_lspace(&self) -> u32 {
-        self.lspace
-    }
-
-    fn set_lspace(&mut self, lspace: u32) {
-        self.lspace = lspace
-    }
-
-    fn set_rspace(&mut self, rspace: u32) {
-        self.rspace = rspace
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        lazy_static! {
+            static ref RE: regex::Regex = regex::Regex::new(r"(\d+\.\d+)\s*degrees.*").unwrap();
+        }
+        let info = process::Command::new("acpi").arg("-t").output()?;
+        if !info.status.success() {
+            bail!(
+                "\"acpi -t\" returned exit signal {}. Error: {}",
+                info.status,
+                String::from_utf8(info.stderr)?,
+            );
+        }
+        let output = String::from_utf8(info.stdout)?;
+        let temp: f32 = RE
+            .captures(&output)
+            .and_then(|c| c.get(1))
+            .unwrap()
+            .as_str()
+            .parse()?;
+        let val: f32 = if temp > self.max {
+            1.0
+        } else if temp < self.min {
+            0.0
+        } else {
+            (temp - self.min) / (self.max - self.min)
+        };
+        w.bar(
+            val,
+            self.cmap.map((val * 100.) as u8),
+            self.width,
+            self.height,
+        )?;
+        w.write(b"\n")?;
+        Ok(())
     }
 }

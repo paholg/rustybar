@@ -31,27 +31,53 @@ pub enum EntryConfig {
 }
 
 enum Entry {
-    Bar(Box<StatusBar>),
+    Bar(Box<Bar>),
     Space(i32),
 }
 
-// Don't use space_available for the center bar
-pub fn entries_to_bars(
+pub fn generate_bars(
+    config: &Config,
+    char_width: u32,
+    total_width: u32,
+) -> Result<Vec<BarWithSep>, failure::Error> {
+    let center = configs_to_bars(&config.center, char_width, None)?;
+    let center_len: u32 = center.iter().map(|b| b.len()).sum();
+    let left_space = (total_width - center_len) / 2;
+    let right_space = (total_width - center_len + 1) / 2;
+    let mut left = configs_to_bars(&config.left, char_width, Some(left_space))?;
+    let right = configs_to_bars(&config.right, char_width, Some(right_space))?;
+    left.extend(center);
+    left.extend(right);
+    Ok(left)
+}
+
+fn configs_to_bars(
     entry_configs: &[EntryConfig],
     char_width: u32,
     space_available: Option<u32>,
-) -> Result<Vec<Box<StatusBar>>, failure::Error> {
-    let mut entries: Vec<Entry> = {
-        let entries: Result<Vec<_>, failure::Error> = entry_configs
-            .iter()
-            .map(|e| match e {
-                &EntryConfig::Space(ref s) => Ok(Entry::Space(s.space)),
-                &EntryConfig::Bar(ref b) => Ok(Entry::Bar(b.into_bar(char_width)?)),
-            })
-            .collect();
-        entries?
-    };
+) -> Result<Vec<BarWithSep>, failure::Error> {
+    let entries = configs_to_entries(entry_configs, char_width)?;
+    entries_to_bars(entries, space_available)
+}
 
+fn configs_to_entries(
+    entry_configs: &[EntryConfig],
+    char_width: u32,
+) -> Result<Vec<Entry>, failure::Error> {
+    entry_configs
+        .iter()
+        .map(|e| match e {
+            &EntryConfig::Space(ref s) => Ok(Entry::Space(s.space)),
+            &EntryConfig::Bar(ref b) => Ok(Entry::Bar(b.into_bar(char_width)?)),
+        })
+        .collect()
+}
+
+// Don't use space_available for the center bar
+fn entries_to_bars(
+    entries: Vec<Entry>,
+    space_available: Option<u32>,
+) -> Result<Vec<BarWithSep>, failure::Error> {
     let space_used: u32 = entries
         .iter()
         .map(|e| match e {
@@ -101,10 +127,12 @@ pub fn entries_to_bars(
         bail!("Cannot use dynamic space on the center bar.");
     }
 
+    let mut res: Vec<BarWithSep> = Vec::new();
+
     let mut space = 0;
-    for entry in entries.iter_mut() {
+    for entry in entries.into_iter() {
         match entry {
-            &mut Entry::Space(s) => {
+            Entry::Space(s) => {
                 let sp = if s < 0 {
                     ((-s) as u32 * space_remaining) / dynamic_space_denom
                 } else {
@@ -112,20 +140,17 @@ pub fn entries_to_bars(
                 };
                 space += sp;
             }
-            &mut Entry::Bar(ref mut bar) => {
-                bar.set_lspace(space);
+            Entry::Bar(bar) => {
+                let mut new = BarWithSep::new(bar);
+                new.left = space;
                 space = 0;
+                res.push(new);
             }
         }
     }
 
-    let mut res: Vec<Box<StatusBar>> = entries
-        .into_iter()
-        .filter_map(|e| if let Entry::Bar(b) = e { Some(b) } else { None })
-        .collect();
-
     if let Some(bar) = res.last_mut() {
-        bar.set_rspace(space + dynamic_space_remainder);
+        bar.right = space + dynamic_space_remainder;
     }
 
     Ok(res)

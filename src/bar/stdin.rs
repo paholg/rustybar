@@ -1,7 +1,9 @@
 use failure;
-use std::{io, process, io::{BufRead, Write}};
+use std::{io,
+          io::{BufRead, Write},
+          process};
 
-use bar::{write_space, StatusBar};
+use bar::{Bar, WriteBar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct StdinConfig {
@@ -13,8 +15,7 @@ pub struct StdinConfig {
 pub struct Stdin {
     length: u32,
     char_width: u32,
-    lspace: u32,
-    rspace: u32,
+    buffer: String,
 }
 
 impl Stdin {
@@ -22,41 +23,28 @@ impl Stdin {
         Ok(Stdin {
             length: config.length,
             char_width: char_width,
-            lspace: 0,
-            rspace: 0,
+            buffer: String::new(),
         })
     }
 }
 
-impl StatusBar for Stdin {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-        let stdin = io::stdin();
-        let handle = stdin.lock();
+impl Bar for Stdin {
+    fn len(&self) -> u32 {
+        self.length * self.char_width
+    }
 
-        for line in handle.lines() {
-            let line = line?;
-            write_space(w, self.lspace)?;
-            w.write(line.as_bytes())?;
-            write_space(w, self.rspace)?;
-            w.write(b"\n")?;
-        }
-
+    fn block(&self) -> Result<(), failure::Error> {
         Ok(())
     }
 
-    fn len(&self) -> u32 {
-        self.lspace + self.length * self.char_width + self.rspace
-    }
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        self.buffer.clear();
+        // fixme: This locks for every read.
+        io::stdin().read_line(&mut self.buffer)?;
 
-    fn get_lspace(&self) -> u32 {
-        self.lspace
-    }
+        w.write(b"\n^tw()")?;
+        w.write(self.buffer.as_bytes())?;
 
-    fn set_lspace(&mut self, lspace: u32) {
-        self.lspace = lspace
-    }
-
-    fn set_rspace(&mut self, rspace: u32) {
-        self.rspace = rspace
+        Ok(())
     }
 }

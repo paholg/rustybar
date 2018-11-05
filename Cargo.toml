@@ -4,12 +4,14 @@
   authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 
 [dependencies]
+  chrono = "*"
   directories = "*"
   failure = "*"
   inotify = "*"
+  lazy_static = "*"
   regex = "*"
-  chrono = "*"
-  toml = "*"
   serde = "*"
   serde_derive = "*"
   structopt = "*"
+  sysinfo = "*"
+  toml = "*"

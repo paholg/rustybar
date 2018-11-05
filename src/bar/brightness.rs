@@ -1,10 +1,10 @@
 use colormap::{ColorMap, ColorMapConfig};
 
-use inotify;
 use failure;
-use std::{fs, path, process, io::Read, io::Write};
+use inotify;
+use std::{fmt, fs, io::Read, io::Write, path, process};
 
-use bar::{write_one_bar, write_space, StatusBar};
+use bar::{Bar, WriteBar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct BrightnessConfig {
@@ -22,8 +22,6 @@ pub struct Brightness {
     cmap: ColorMap,
     width: u32,
     height: u32,
-    lspace: u32,
-    rspace: u32,
 }
 
 impl Brightness {
@@ -63,62 +61,89 @@ impl Brightness {
             cmap: ColorMap::from_config(&config.colormap)?,
             width: config.width,
             height: config.height,
-            lspace: 0,
-            rspace: 0,
         })
     }
 }
 
-impl StatusBar for Brightness {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-        let mut inotify = inotify::Inotify::init()?;
-        inotify.add_watch(&self.path_current, inotify::WatchMask::MODIFY)?;
-
-        let mut perform = || -> Result<(), failure::Error> {
-            let current_string = {
-                let mut buffer = String::new();
-                fs::File::open(&self.path_current)?.read_to_string(&mut buffer)?;
-                buffer
-            };
-            let current: f32 = current_string.trim().parse()?;
-            let val = current / self.max;
-
-            write_space(w, self.lspace)?;
-            w.write(
-                b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)",
-            )?;
-            write_one_bar(
-                w,
-                val,
-                self.cmap.map((val * 100.) as u8),
-                self.width,
-                self.height,
-            )?;
-            w.write(b"^ca()^ca()\n")?;
-            write_space(w, self.rspace)?;
-            Ok(())
-        };
-
-        let mut buffer = [0; 1024];
-        loop {
-            perform()?;
-            inotify.read_events_blocking(&mut buffer)?.next();
-        }
-    }
-
+impl Bar for Brightness {
     fn len(&self) -> u32 {
-        self.lspace + self.width + self.rspace
+        self.width
     }
 
-    fn get_lspace(&self) -> u32 {
-        self.lspace
-    }
+    // TODO: impl block with inotify
 
-    fn set_lspace(&mut self, lspace: u32) {
-        self.lspace = lspace
-    }
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        let current_string = {
+            let mut buffer = String::new();
+            fs::File::open(&self.path_current)?.read_to_string(&mut buffer)?;
+            buffer
+        };
+        let current: f32 = current_string.trim().parse()?;
+        let val = current / self.max;
 
-    fn set_rspace(&mut self, rspace: u32) {
-        self.rspace = rspace
+        w.write(b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)")?;
+
+        w.bar(
+            val,
+            self.cmap.map((val * 100.) as u8),
+            self.width,
+            self.height,
+        )?;
+        w.write(b"^ca()^ca()\n")?;
+        Ok(())
     }
 }
+
+// impl StatusBar for Brightness {
+//     fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
+//         let mut inotify = inotify::Inotify::init()?;
+//         inotify.add_watch(&self.path_current, inotify::WatchMask::MODIFY)?;
+
+//         let mut perform = || -> Result<(), failure::Error> {
+//             let current_string = {
+//                 let mut buffer = String::new();
+//                 fs::File::open(&self.path_current)?.read_to_string(&mut buffer)?;
+//                 buffer
+//             };
+//             let current: f32 = current_string.trim().parse()?;
+//             let val = current / self.max;
+
+//             write_space(w, self.lspace)?;
+//             w.write(
+//                 b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)",
+//             )?;
+//             write_one_bar(
+//                 w,
+//                 val,
+//                 self.cmap.map((val * 100.) as u8),
+//                 self.width,
+//                 self.height,
+//             )?;
+//             w.write(b"^ca()^ca()\n")?;
+//             write_space(w, self.rspace)?;
+//             Ok(())
+//         };
+
+//         let mut buffer = [0; 1024];
+//         loop {
+//             perform()?;
+//             inotify.read_events_blocking(&mut buffer)?.next();
+//         }
+//     }
+
+//     fn len(&self) -> u32 {
+//         self.lspace + self.width + self.rspace
+//     }
+
+//     fn get_lspace(&self) -> u32 {
+//         self.lspace
+//     }
+
+//     fn set_lspace(&mut self, lspace: u32) {
+//         self.lspace = lspace
+//     }
+
+//     fn set_rspace(&mut self, rspace: u32) {
+//         self.rspace = rspace
+//     }
+// }

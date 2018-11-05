@@ -1,10 +1,9 @@
+use bar::{Bar, WriteBar, Writer};
 use colormap::{ColorMap, ColorMapConfig};
-
 use failure;
-use regex;
-use std::{fs, path, process, thread, time, io::Read, io::Write};
-
-use bar::{write_one_bar, write_space, StatusBar};
+use lazy_static;
+use regex::Regex;
+use std::{fs, io::Read, io::Write, path, process, thread, time};
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryConfig {
@@ -36,90 +35,65 @@ impl Memory {
     }
 }
 
-impl StatusBar for Memory {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-        let path = path::Path::new("/proc/meminfo");
-        if !path.is_file() {
-            bail!(
-                "The file {} does not exist. You cannot use the cpu bar without it. Are you sure you're running GNU/Linux?",
-                path.display()
-            );
+impl Bar for Memory {
+    fn len(&self) -> u32 {
+        self.width
+    }
+
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        lazy_static! {
+            static ref RE_TOT: Regex = Regex::new(r"MemTotal.*?(\d+)").unwrap();
+            static ref RE_FREE: Regex = Regex::new(r"MemFree.*?(\d+)").unwrap();
+            static ref RE_BUFFERS: Regex = Regex::new(r"Buffers.*?(\d+)").unwrap();
+            static ref RE_CACHED: Regex = Regex::new(r"Cached.*?(\d+)").unwrap();
+            static ref PATH: path::PathBuf = path::Path::new("/proc/meminfo").into();
         }
-        let re_tot = regex::Regex::new(r"MemTotal.*?(\d+)")?;
-        let re_free = regex::Regex::new(r"MemFree.*?(\d+)")?;
-        let re_buffers = regex::Regex::new(r"Buffers.*?(\d+)")?;
-        let re_cached = regex::Regex::new(r"Cached.*?(\d+)")?;
+
         let info = {
             let mut buffer = String::new();
-            fs::File::open(&path)?.read_to_string(&mut buffer)?;
+            fs::File::open(&*PATH)?.read_to_string(&mut buffer)?;
             buffer
         };
 
-        // let total: f32 = 1.0;
-        let total: f32 = re_tot
+        let free: f32 = RE_FREE
             .captures(&info)
             .unwrap()
             .get(1)
             .unwrap()
             .as_str()
             .parse()?;
+        let buffers: f32 = RE_BUFFERS
+            .captures(&info)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .parse()?;
+        let cached: f32 = RE_CACHED
+            .captures(&info)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .parse()?;
+        let total: f32 = RE_TOT
+            .captures(&info)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .parse()?;
+        let val = (total - free - buffers - cached) / total;
 
-        loop {
-            let info = {
-                let mut buffer = String::new();
-                fs::File::open(&path)?.read_to_string(&mut buffer)?;
-                buffer
-            };
-            let free: f32 = re_free
-                .captures(&info)
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_str()
-                .parse()?;
-            let buffers: f32 = re_buffers
-                .captures(&info)
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_str()
-                .parse()?;
-            let cached: f32 = re_cached
-                .captures(&info)
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_str()
-                .parse()?;
-            let val = (total - free - buffers - cached) / total;
+        w.bar(
+            val,
+            self.cmap.map((val * 100.) as u8),
+            self.width,
+            self.height,
+        )?;
+        w.space(self.rspace)?;
+        w.write(b"\n")?;
 
-            write_space(w, self.lspace)?;
-            write_one_bar(
-                w,
-                val,
-                self.cmap.map((val * 100.) as u8),
-                self.width,
-                self.height,
-            )?;
-            write_space(w, self.rspace)?;
-            w.write(b"\n")?;
-
-            thread::sleep(time::Duration::from_secs(1));
-        }
-    }
-    fn len(&self) -> u32 {
-        self.lspace + self.width + self.rspace
-    }
-
-    fn get_lspace(&self) -> u32 {
-        self.lspace
-    }
-
-    fn set_lspace(&mut self, lspace: u32) {
-        self.lspace = lspace
-    }
-
-    fn set_rspace(&mut self, rspace: u32) {
-        self.rspace = rspace
+        Ok(())
     }
 }

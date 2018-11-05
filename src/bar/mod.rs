@@ -6,15 +6,18 @@ mod cpu_temp;
 mod memory;
 mod stdin;
 
-pub use self::{battery::{Battery, BatteryConfig}, brightness::{Brightness, BrightnessConfig},
-               clock::{Clock, ClockConfig}, cpu::{Cpu, CpuConfig},
-               cpu_temp::{CpuTemp, CpuTempConfig}, memory::{Memory, MemoryConfig},
-               stdin::{Stdin, StdinConfig}};
+pub use self::{
+    battery::{Battery, BatteryConfig}, brightness::{Brightness, BrightnessConfig},
+    clock::{Clock, ClockConfig}, cpu::{Cpu, CpuConfig}, cpu_temp::{CpuTemp, CpuTempConfig},
+    memory::{Memory, MemoryConfig}, stdin::{Stdin, StdinConfig},
+};
 
-use std::{fmt, marker, process, io::Write};
 use failure;
+use std::{fmt, io, io::Write, marker, process, time::Duration};
 
 use colormap::Color;
+
+pub type Writer = process::ChildStdin;
 
 // fixme: this should be settable
 static TEXTCOLOR: &'static str = "#888888";
@@ -26,6 +29,66 @@ pub trait StatusBar: fmt::Debug + marker::Send + marker::Sync {
     fn get_lspace(&self) -> u32;
     fn set_lspace(&mut self, lspace: u32);
     fn set_rspace(&mut self, rspace: u32);
+}
+
+pub trait Bar: fmt::Debug + marker::Send + marker::Sync {
+    /// Give the length in pixels of the output string. This is used to size the dzen2 bar and to
+    /// allocate space. It should never change.
+    fn len(&self) -> u32;
+
+    /// Blocks the thread until it is time to produce the next output. Default implemention sleeps
+    /// for 1 second.
+    fn block(&self) -> Result<(), failure::Error> {
+        ::std::thread::sleep(Duration::from_secs(1));
+        Ok(())
+    }
+
+    fn initialize(&mut self) -> Result<(), failure::Error> {
+        Ok(())
+    }
+
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error>;
+}
+
+#[derive(Debug)]
+pub struct BarWithSep {
+    bar: Box<Bar>,
+    pub left: u32,
+    pub right: u32,
+}
+
+impl BarWithSep {
+    pub fn new(bar: Box<Bar>) -> BarWithSep {
+        BarWithSep {
+            left: 0,
+            bar: bar,
+            right: 0,
+        }
+    }
+}
+
+impl Bar for BarWithSep {
+    fn len(&self) -> u32 {
+        self.left + self.bar.len() + self.right
+    }
+
+    fn block(&self) -> Result<(), failure::Error> {
+        self.bar.block()
+    }
+
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        if self.left > 0 {
+            write!(w, "^r({}x0)", self.left)?;
+        }
+
+        self.bar.write(w)?;
+
+        if self.right > 0 {
+            write!(w, "^r({}x0)", self.right)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,8 +105,8 @@ pub enum BarConfig {
 }
 
 impl BarConfig {
-    pub fn into_bar(&self, char_width: u32) -> Result<Box<StatusBar>, failure::Error> {
-        let bar: Box<StatusBar> = match self {
+    pub fn into_bar(&self, char_width: u32) -> Result<Box<Bar>, failure::Error> {
+        let bar: Box<Bar> = match self {
             &BarConfig::battery(ref b) => Box::new(Battery::from_config(&b, char_width)?),
             &BarConfig::brightness(ref b) => Box::new(Brightness::from_config(&b, char_width)?),
             &BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),
@@ -57,30 +120,28 @@ impl BarConfig {
     }
 }
 
-pub fn write_one_bar(
-    w: &mut process::ChildStdin,
-    val: f32,
-    color: Color,
-    width: u32,
-    height: u32,
-) -> Result<(), failure::Error> {
-    // fixme: .round()?
-    let wfill = (val * (width as f32) + 0.5) as u32;
-    let wempty = width - wfill;
-    write!(
-        w,
-        "^fg({})^r({2}x{1})^ro({3}x{1})",
-        color, height, wfill, wempty
-    )?;
-    Ok(())
+pub trait WriteBar {
+    fn bar(&mut self, val: f32, color: Color, width: u32, height: u32) -> Result<(), io::Error>;
+    fn space(&mut self, width: u32) -> Result<(), io::Error>;
+    fn sep(&mut self, height: u32) -> Result<(), io::Error>;
 }
 
-pub fn write_space(w: &mut process::ChildStdin, width: u32) -> Result<(), failure::Error> {
-    write!(w, "^r({}x0)", width)?;
-    Ok(())
-}
+impl<W: Write> WriteBar for W {
+    fn bar(&mut self, val: f32, color: Color, width: u32, height: u32) -> Result<(), io::Error> {
+        let wfill = (val * (width as f32) + 0.5) as u32;
+        let wempty = width - wfill;
+        write!(
+            self,
+            "^fg({})^r({2}x{1})^ro({3}x{1})",
+            color, height, wfill, wempty
+        )
+    }
 
-pub fn write_sep(w: &mut process::ChildStdin, height: u32) -> Result<(), failure::Error> {
-    write!(w, "^fg({})^r(2x{})", TEXTCOLOR, height)?;
-    Ok(())
+    fn space(&mut self, width: u32) -> Result<(), io::Error> {
+        write!(self, "^r({}x0)", width)
+    }
+
+    fn sep(&mut self, height: u32) -> Result<(), io::Error> {
+        write!(self, "^fg({})^r(2x{})", TEXTCOLOR, height)
+    }
 }

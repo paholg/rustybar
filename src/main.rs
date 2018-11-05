@@ -4,21 +4,32 @@ extern crate directories;
 extern crate failure;
 extern crate inotify;
 extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate structopt;
+extern crate sysinfo;
 extern crate toml;
 
-use std::{fs, process, thread, io::{Read, Write}};
-use std::str::FromStr;
+use std::{
+    fs,
+    io::{Read, Write},
+    process,
+    sync::mpsc,
+    sync::{atomic, Arc},
+    thread,
+};
 
 // use structopt::StructOpt;
 
 mod bar;
 mod colormap;
 mod config;
+
+use bar::Bar;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rustybar", about = "A simple statusbar program.")]
@@ -52,15 +63,14 @@ fn run() -> Result<(), failure::Error> {
     let config: config::Config = toml::from_str(&toml_string)?;
     println!("Config: {:#?}", config);
 
-    // -- get resolution and dpi (fixme) ------------
+    // -- get dpi (fixme) ------------
     // let dpi = get_dpi(96);
-    let res = get_resolution()?;
 
-    let font = config.font;
+    let font = &config.font;
     let height = config.height;
     let lgap = config.left_gap;
     let rgap = config.right_gap;
-    let bg = config.background;
+    let bg = &config.background;
 
     // TODO: THIS IS TMEPOERERXS
     // let bgs = vec![
@@ -69,63 +79,80 @@ fn run() -> Result<(), failure::Error> {
     // ];
     // let mut bg_iter = bgs.iter();
 
-    let char_width = char_width(&font);
+    let char_width = char_width(font);
 
-    let bars = {
-        let center = config::entries_to_bars(&config.center, char_width, None)?;
-        let center_len: u32 = center.iter().map(|b| b.len()).sum();
-        let left_space = (res - center_len) / 2;
-        let right_space = (res - center_len + 1) / 2;
-        println!("c: {}, l: {}, r: {}", center_len, left_space, right_space);
-        let mut left = config::entries_to_bars(&config.left, char_width, Some(left_space))?;
-        let right = config::entries_to_bars(&config.right, char_width, Some(right_space))?;
-        left.extend(center);
-        left.extend(right);
-        left
-    };
+    let mut screens = Vec::new();
+    let mut threads: Vec<thread::JoinHandle<_>> = Vec::new();
+    let reset = Arc::new(atomic::AtomicBool::new(true));
 
-    let mut threads = Vec::new();
-    let mut left = 0;
-    for bar in bars {
-        println!("Left: {}, Bar len: {}", left, bar.len());
-        let len = bar.len();
-        {
-            let font = font.clone();
-            let left = left.clone();
-            let bg = bg.clone();
-            // let bg = bg_iter.next().unwrap().clone();
-            let handler = thread::spawn(move || {
-                let process = process::Command::new("dzen2")
-                    .args(&[
-                        "-fn",
-                        &font,
-                        "-x",
-                        &left.to_string(),
-                        "-w",
-                        &bar.len().to_string(),
-                        "-h",
-                        &height.to_string(),
-                        "-bg",
-                        &bg,
-                        "-ta",
-                        "l",
-                        "-e",
-                        "onstart=lower",
-                    ])
-                    .stdin(process::Stdio::piped())
-                    .spawn()
-                    .unwrap();
-                bar.run(&mut process.stdin.unwrap()).unwrap();
-            });
-            threads.push(handler);
+    loop {
+        let new_screens = get_screens()?;
+        if new_screens == screens {
+            thread::sleep(std::time::Duration::from_secs(1));
+            continue;
         }
-        left += len;
-    }
+        std::mem::replace(&mut screens, new_screens);
 
-    ::std::thread::sleep(std::time::Duration::from_secs(100000000000));
-    // for thread in threads {
-    //     thread.join()?;
-    // }
+        reset.store(true, atomic::Ordering::Relaxed);
+
+        for thread in threads {
+            thread.join().unwrap();
+        }
+        threads = Vec::new();
+
+        reset.store(false, atomic::Ordering::Relaxed);
+
+        let bars = config::generate_bars(&config, char_width, screens[0].width)?;
+
+        let mut left = 0;
+        for mut bar in bars {
+            let len = bar.len();
+            let reset = reset.clone();
+            {
+                let font = font.clone();
+                let left = left.clone();
+                let bg = bg.clone();
+                let handler = thread::spawn(move || -> Result<(), failure::Error> {
+                    let process = process::Command::new("dzen2")
+                        .args(&[
+                            "-dock",
+                            "-fn",
+                            &font,
+                            "-x",
+                            &left.to_string(),
+                            "-w",
+                            &(bar.len()).to_string(),
+                            "-h",
+                            &height.to_string(),
+                            "-bg",
+                            &bg,
+                            "-ta",
+                            "l",
+                            "-e",
+                            "onstart=lower",
+                            "-xs",
+                            "0",
+                        ])
+                        .stdin(process::Stdio::piped())
+                        .spawn()
+                        .unwrap();
+                    let mut child_stdin = &mut process.stdin.unwrap();
+                    bar.initialize()?;
+                    loop {
+                        bar.write(&mut child_stdin)?;
+                        bar.block()?;
+                        if reset.load(atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                    }
+                    Ok(())
+                });
+
+                threads.push(handler);
+            }
+            left += len;
+        }
+    }
 
     Ok(())
 }
@@ -140,14 +167,32 @@ fn main() {
     }
 }
 
-fn get_resolution() -> Result<u32, failure::Error> {
-    let output = std::process::Command::new("xrandr").output()?.stdout;
-    let out = String::from_utf8(output)?;
+#[derive(Debug, Eq, PartialEq)]
+struct Screen {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+}
 
-    let re = regex::Regex::new(r"current\s(\d+)\sx\s\d+")?;
-    let cap = re.captures_iter(&out).nth(0).unwrap();
-    let res: u32 = FromStr::from_str(&cap[1])?;
-    Ok(res)
+fn get_screens() -> Result<Vec<Screen>, failure::Error> {
+    lazy_static! {
+        static ref RE: regex::Regex = regex::Regex::new(r"\d:.* (\d+).*+(\d+)+(\d+)").unwrap();
+    }
+
+    let output = std::process::Command::new("xrandr")
+        .arg("--listactivemonitors")
+        .output()?
+        .stdout;
+    let out = String::from_utf8(output)?;
+    RE.captures_iter(&out)
+        .map(|cap| {
+            Ok(Screen {
+                width: cap[1].parse::<u32>()? - 1,
+                x: cap[2].parse()?,
+                y: cap[3].parse()?,
+            })
+        })
+        .collect()
 }
 
 fn char_width(_font: &str) -> u32 {
