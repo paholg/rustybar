@@ -1,5 +1,3 @@
-use failure;
-
 use std::fmt;
 use std::num::ParseIntError;
 
@@ -22,6 +20,7 @@ impl Color {
     }
 }
 
+#[derive(Debug)]
 pub enum ParseError {
     ParseIntError(ParseIntError),
     Other(String),

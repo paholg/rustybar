@@ -1,11 +1,7 @@
 use failure;
-use std::{
-    io,
-    io::{BufRead, Write},
-    process,
-};
+use std::{io, io::Write};
 
-use crate::bar::{Bar, WriteBar, Writer};
+use crate::bar::{Bar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct StdinConfig {

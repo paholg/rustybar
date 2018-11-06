@@ -7,8 +7,8 @@ extern crate serde_derive;
 
 use directories;
 use regex;
-use slog::{slog_debug, slog_error, slog_info, slog_o, slog_warn, Drain};
-use slog_scope::{debug, error, info, warn};
+use slog::{slog_debug, slog_error, slog_info, slog_o, Drain};
+use slog_scope::{debug, error, info};
 use std::{
     fs,
     io::{Read, Write},
@@ -88,7 +88,7 @@ fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
         reset.store(true, atomic::Ordering::Relaxed);
 
         for thread in threads {
-            thread.join().unwrap();
+            thread.join().unwrap()?;
         }
         threads = Vec::new();
 
@@ -146,8 +146,6 @@ fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
             left += len;
         }
     }
-
-    Ok(())
 }
 
 fn main() {

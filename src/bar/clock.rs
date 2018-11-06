@@ -1,6 +1,6 @@
-use std::{io::Write, process, thread, time};
+use std::io::Write;
 
-use crate::bar::{Bar, WriteBar, Writer};
+use crate::bar::{Bar, Writer};
 
 use chrono;
 use failure;

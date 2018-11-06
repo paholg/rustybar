@@ -1,7 +1,5 @@
 use failure;
 
-use std::fmt;
-
 use crate::color::Color;
 
 #[derive(Debug, Deserialize)]

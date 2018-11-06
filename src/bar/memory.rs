@@ -1,9 +1,8 @@
 use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
-use lazy_static;
 use regex::Regex;
-use std::{fs, io::Read, io::Write, path, process, thread, time};
+use std::{fs, io::Read, io::Write, path};
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryConfig {

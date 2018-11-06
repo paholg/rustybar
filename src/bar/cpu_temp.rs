@@ -1,10 +1,9 @@
 use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
-use lazy_static;
 use regex;
 use std::string::String;
-use std::{io::Write, process, time::Duration};
+use std::{io::Write, process};
 
 #[derive(Debug, Deserialize)]
 pub struct CpuTempConfig {
