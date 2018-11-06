@@ -83,6 +83,7 @@ impl Bar for BarWithSep {
         if self.right > 0 {
             write!(w, "^r({}x0)", self.right)?;
         }
+        w.write_all(b"\n")?;
 
         Ok(())
     }

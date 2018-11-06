@@ -45,7 +45,7 @@ impl Bar for Clock {
     fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
         let now = chrono::Local::now();
         let text = now.format(&self.format);
-        writeln!(w, "^fg({}){}", self.color, text)?;
+        write!(w, "^fg({}){}", self.color, text)?;
         Ok(())
     }
 }

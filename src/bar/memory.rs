@@ -2,7 +2,7 @@ use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
 use regex::Regex;
-use std::{fs, io::Read, io::Write, path};
+use std::{fs, io::Read, path};
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryConfig {
@@ -18,8 +18,6 @@ pub struct Memory {
     cmap: ColorMap,
     width: u32,
     height: u32,
-    lspace: u32,
-    rspace: u32,
 }
 
 impl Memory {
@@ -28,8 +26,6 @@ impl Memory {
             cmap: ColorMap::from_config(&config.colormap)?,
             width: config.width,
             height: config.height,
-            lspace: 0,
-            rspace: 0,
         })
     }
 }
@@ -90,8 +86,6 @@ impl Bar for Memory {
             self.width,
             self.height,
         )?;
-        w.space(self.rspace)?;
-        w.write_all(b"\n")?;
 
         Ok(())
     }

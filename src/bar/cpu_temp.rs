@@ -2,8 +2,8 @@ use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
 use regex;
+use std::process;
 use std::string::String;
-use std::{io::Write, process};
 
 #[derive(Debug, Deserialize)]
 pub struct CpuTempConfig {
@@ -76,7 +76,6 @@ impl Bar for CpuTemp {
             self.width,
             self.height,
         )?;
-        w.write_all(b"\n")?;
         Ok(())
     }
 }

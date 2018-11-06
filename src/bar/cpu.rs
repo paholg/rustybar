@@ -3,7 +3,7 @@ use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
 use regex::Regex;
-use std::{fs, io::Read, io::Write, path};
+use std::{fs, io::Read, path};
 
 #[derive(Debug, Deserialize)]
 pub struct CpuConfig {
@@ -149,7 +149,6 @@ impl Bar for Cpu {
                 }
             }
         }
-        w.write_all(b"\n")?;
         self.old_idles = idles;
 
         Ok(())

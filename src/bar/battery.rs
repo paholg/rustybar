@@ -109,7 +109,6 @@ impl Bar for Battery {
             _ => "^fg(#00ffff)*",
         };
         w.write_all(status.as_bytes())?;
-        w.write_all(b"\n")?;
 
         Ok(())
     }

@@ -102,7 +102,7 @@ impl Bar for Brightness {
             self.width,
             self.height,
         )?;
-        w.write_all(b"^ca()^ca()\n")?;
+        w.write_all(b"^ca()^ca()")?;
         Ok(())
     }
 

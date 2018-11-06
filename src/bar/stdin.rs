@@ -31,17 +31,18 @@ impl Bar for Stdin {
         self.length * self.char_width
     }
 
+    // This bar is a bit unusual, and the blocking happens in the `write` function.
     fn block(&mut self) -> Result<(), failure::Error> {
         Ok(())
     }
 
     fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
         self.buffer.clear();
-        // fixme: This locks for every read.
         io::stdin().read_line(&mut self.buffer)?;
 
-        w.write_all(b"\n^tw()")?;
-        w.write_all(self.buffer.as_bytes())?;
+        w.write_all(b"^tw()")?;
+        // Skip the final new line as that is provided by `BarWithSep`
+        w.write_all(self.buffer[0..self.buffer.len() - 1].as_bytes())?;
 
         Ok(())
     }
