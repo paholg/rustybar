@@ -3,7 +3,7 @@ use std::{io,
           io::{BufRead, Write},
           process};
 
-use bar::{Bar, WriteBar, Writer};
+use crate::bar::{Bar, WriteBar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct StdinConfig {

@@ -29,7 +29,7 @@ mod bar;
 mod colormap;
 mod config;
 
-use bar::Bar;
+use crate::bar::Bar;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rustybar", about = "A simple statusbar program.")]
@@ -68,8 +68,8 @@ fn run() -> Result<(), failure::Error> {
 
     let font = &config.font;
     let height = config.height;
-    let lgap = config.left_gap;
-    let rgap = config.right_gap;
+    let _lgap = config.left_gap;
+    let _rgap = config.right_gap;
     let bg = &config.background;
 
     // TODO: THIS IS TMEPOERERXS

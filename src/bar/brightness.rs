@@ -1,10 +1,10 @@
-use colormap::{ColorMap, ColorMapConfig};
+use crate::colormap::{ColorMap, ColorMapConfig};
 
 use failure;
 use inotify;
 use std::{fmt, fs, io::Read, io::Write, path, process};
 
-use bar::{Bar, WriteBar, Writer};
+use crate::bar::{Bar, WriteBar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct BrightnessConfig {

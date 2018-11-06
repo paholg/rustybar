@@ -1,9 +1,9 @@
-use colormap::{ColorMap, ColorMapConfig};
+use crate::colormap::{ColorMap, ColorMapConfig};
 
 use failure;
 use std::{fmt, fs, io::Read, io::Write, path::PathBuf, process};
 
-use bar::{Bar, WriteBar, Writer};
+use crate::bar::{Bar, WriteBar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct BatteryConfig {

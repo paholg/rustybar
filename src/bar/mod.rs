@@ -15,7 +15,7 @@ pub use self::{
 use failure;
 use std::{fmt, io, io::Write, marker, process, time::Duration};
 
-use colormap::Color;
+use crate::colormap::Color;
 
 pub type Writer = process::ChildStdin;
 

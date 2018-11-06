@@ -1,5 +1,5 @@
-use bar::{Bar, WriteBar, Writer};
-use colormap::{ColorMap, ColorMapConfig};
+use crate::bar::{Bar, WriteBar, Writer};
+use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
 use lazy_static;
 use regex::Regex;

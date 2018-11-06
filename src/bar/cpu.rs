@@ -1,6 +1,6 @@
-use bar::{Bar, WriteBar, Writer};
+use crate::bar::{Bar, WriteBar, Writer};
 use chrono;
-use colormap::{ColorMap, ColorMapConfig};
+use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
 use lazy_static;
 use regex::Regex;

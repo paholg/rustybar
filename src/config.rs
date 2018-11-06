@@ -1,4 +1,4 @@
-use bar::*;
+use crate::bar::*;
 
 use failure;
 
