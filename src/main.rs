@@ -1,18 +1,18 @@
-extern crate chrono;
-extern crate directories;
+
+use directories;
 #[macro_use]
 extern crate failure;
-extern crate inotify;
-extern crate regex;
+
+use regex;
 #[macro_use]
 extern crate lazy_static;
-extern crate serde;
+
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate structopt;
-extern crate sysinfo;
-extern crate toml;
+
+use toml;
 
 use std::{
     fs,

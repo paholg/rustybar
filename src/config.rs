@@ -31,7 +31,7 @@ pub enum EntryConfig {
 }
 
 enum Entry {
-    Bar(Box<Bar>),
+    Bar(Box<dyn Bar>),
     Space(i32),
 }
 

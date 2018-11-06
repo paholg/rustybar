@@ -52,13 +52,13 @@ pub trait Bar: fmt::Debug + marker::Send + marker::Sync {
 
 #[derive(Debug)]
 pub struct BarWithSep {
-    bar: Box<Bar>,
+    bar: Box<dyn Bar>,
     pub left: u32,
     pub right: u32,
 }
 
 impl BarWithSep {
-    pub fn new(bar: Box<Bar>) -> BarWithSep {
+    pub fn new(bar: Box<dyn Bar>) -> BarWithSep {
         BarWithSep {
             left: 0,
             bar: bar,
@@ -105,8 +105,8 @@ pub enum BarConfig {
 }
 
 impl BarConfig {
-    pub fn into_bar(&self, char_width: u32) -> Result<Box<Bar>, failure::Error> {
-        let bar: Box<Bar> = match self {
+    pub fn into_bar(&self, char_width: u32) -> Result<Box<dyn Bar>, failure::Error> {
+        let bar: Box<dyn Bar> = match self {
             &BarConfig::battery(ref b) => Box::new(Battery::from_config(&b, char_width)?),
             &BarConfig::brightness(ref b) => Box::new(Brightness::from_config(&b, char_width)?),
             &BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),

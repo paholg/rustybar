@@ -41,7 +41,7 @@ impl Color {
 
 impl fmt::Display for Color {
     /// Color triplets will be printed in the form #ffffff
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
     }
 }
