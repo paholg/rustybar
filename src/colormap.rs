@@ -49,13 +49,10 @@ impl ColorMap {
 
     /// This does the interpolation, and gives you the color corresponding to the value
     /// called with, as dicated by the color map.
-    /// Panics if val is not in the range [0, 100].
+    /// Clamps val to a maximum of 100.
     pub fn map(&self, val: u8) -> Color {
-        assert!(
-            val <= 100,
-            "Tried to get a color using index {} (needs to be in [0,100]).",
-            val
-        );
+        let val = std::cmp::min(val, 100);
+
         let mut i = 1;
         while self.values[i] < val {
             i += 1;
