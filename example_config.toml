@@ -1,0 +1,146 @@
+# --- Global parameters ------
+# Note: Unless stated otherwise, all measurements are in pixels.
+
+# Rustybar expects you to use a monospace font and requires you to specify the character width in
+# pixels. If spacing is off, it is likely that the width is not specified correctly.
+font = "Monospace-9"
+char_width = 10
+
+# Gaps may be useful on either side of the bar if you want to run something else, like a system
+# tray.
+left_gap = 0
+right_gap = 0
+
+height = 18
+background = "#000000"
+
+# A rustybar is divided into three sections; a center-justified center, and left and right sections
+# on either side of it.
+
+# --- Left Section ----------------
+[[left]]
+  bar = "stdin"
+  # stdin is the only bar with indeterminate length, so it must be set. However, it will end up
+  # including the space to its right. In this case, the entire left section will be part of
+  # stdin bar
+  length = 10
+
+[[left]]
+  # Positive values for space give you a space of that many pixels.
+  #
+  # Negative values give you dynamic space; any extra space will be divided among them. For example,
+  # if you have space = -1 and space = -2, the first will get 1/3 of your extra space and the second
+  # will get 2/3 of it.
+  #
+  # It is recommended that you specify at least one entry of dynamic space on the left and right
+  # sections to justify rustybar correctly.
+  #
+  space = -1
+
+# --- Center Section --------------
+[[center]]
+  # We start with a bit of space in the center to ensure that we have a buffer from the stdin bar.
+  space = 20
+[[center]]
+  # The temperature of your cpu, as reported by "acpi -t"
+  bar = "cputemp"
+  width = 35
+  height = 12
+  # Min and max designate the respective temperatures to use for an empty or full bar. They are
+  # accepted as floating point numbers.
+  min = 0.0
+  max = 100.0
+  # The colormap for a bar dictates what color it will be at each key point. Between two set points,
+  # it will be interpolated to give a gradual change. Each element in the colormap is a list of the
+  # form [key, red, green, blue] where keys go from 0 (for empty) to 100 (for full). This map will
+  # go from cyan to yellow to red as your computer heats up.
+  colormap = [[  0,   0, 255, 255],
+              [ 40,   0, 255, 255],
+              [ 80, 255, 255,   0],
+              [100, 255,   0,   0]]
+[[center]]
+  space = 10
+[[center]]
+  # CPU usage, separated by physical core.
+  bar = "cpu"
+  # For something with multiple bars, like this, width designates the width of each individual bar.
+  width = 30
+  # Height designates the height of the bars.
+  height = 12
+  # Space is the space between the individual bars. It is only for things that have multiple bars.
+  space = 8
+  colormap = [[  0,  20,  20,  20],
+              [ 15,  50,  50,  50],
+              [ 30, 180, 200,  60],
+              [ 60, 200, 150,   0],
+              [100, 255,   0,   0]]
+[[center]]
+  space = 10
+[[center]]
+  # Used memory
+  bar = "memory"
+  width = 35
+  height = 12
+  colormap = [[  0,   0, 255, 255],
+              [ 40,   0, 255, 255],
+              [ 80, 255, 255,   0],
+              [100, 255,   0,   0]]
+[[center]]
+  space = 20
+
+# --- right section -------------
+
+[[right]]
+  space = -2
+[[right]]
+  # Screen brightness for laptops.
+  bar = "brightness"
+  width = 35
+  height = 12
+  colormap = [[  0, 255, 255, 255],
+              [100, 128, 128, 128]]
+[[right]]
+  space = 20
+[[right]]
+  # Battery bar for laptops. If you have xdotool installed, you can click or right-click this bar to
+  # adjust brightness (It will send XF86MonBrightnessUp and Down commands).
+  bar = "battery"
+  width = 35
+  height = 12
+  # This space is the space between the battery bar and the charging indicator, which is one
+  # character wide.
+  space = 8
+  # Some laptops have multiple batteries, so you could include more.
+  battery_number = 0
+  colormap = [[  0, 255,   0,   0],
+              [ 35, 255, 255,   0],
+              [100,   0, 255,   0]]
+# [[right]]
+#   space = -3
+
+# Rainbow is useful for viewing colormaps. It shows what a colormap will look like, but spread out
+# in space instead of at different values.
+#
+# This one is an actual rainbow.
+[[right]]
+  bar = "rainbow"
+  width = 101
+  height = 12
+  colormap = [[  0, 255,   0,   0],
+              [ 20, 255, 255,   0],
+              [ 40,   0, 255,   0],
+              [ 60,   0, 255, 255],
+              [ 80,   0,   0, 255],
+              [100, 255,   0, 255]]
+[[right]]
+  space = -3
+[[right]]
+  # I like my date and clock to be different colors, so I have two clock bars.
+  bar = "clock"
+  # This format string gives the date. See "man date" for more options.
+  format = "%a %Y-%m-%d"
+  color = "#3cb371"
+[[right]]
+  bar = "clock"
+  format = "%H:%M:%S"
+  color = "#50e0ff"

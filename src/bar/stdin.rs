@@ -42,7 +42,9 @@ impl Bar for Stdin {
 
         w.write_all(b"^tw()")?;
         // Skip the final new line as that is provided by `BarWithSep`
-        w.write_all(self.buffer[0..self.buffer.len() - 1].as_bytes())?;
+        if self.buffer.len() > 1 {
+            w.write_all(self.buffer[0..self.buffer.len() - 1].as_bytes())?;
+        }
 
         Ok(())
     }

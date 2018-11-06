@@ -4,6 +4,7 @@ mod clock;
 mod cpu;
 mod cpu_temp;
 mod memory;
+mod rainbow;
 mod stdin;
 
 pub use self::{
@@ -13,6 +14,7 @@ pub use self::{
     cpu::{Cpu, CpuConfig},
     cpu_temp::{CpuTemp, CpuTempConfig},
     memory::{Memory, MemoryConfig},
+    rainbow::{Rainbow, RainbowConfig},
     stdin::{Stdin, StdinConfig},
 };
 
@@ -23,8 +25,7 @@ use crate::color::Color;
 
 pub type Writer = process::ChildStdin;
 
-// fixme: this should be settable
-static TEXTCOLOR: &'static str = "#888888";
+static SEPARATOR_COLOR: &'static str = "#888888";
 
 pub trait Bar: fmt::Debug + marker::Send + marker::Sync {
     /// Give the length in pixels of the output string. This is used to size the dzen2 bar and to
@@ -99,6 +100,7 @@ pub enum BarConfig {
     cpu(CpuConfig),
     cputemp(CpuTempConfig),
     memory(MemoryConfig),
+    rainbow(RainbowConfig),
     stdin(StdinConfig),
 }
 
@@ -111,6 +113,7 @@ impl BarConfig {
             BarConfig::cpu(ref b) => Box::new(Cpu::from_config(&b, char_width)?),
             BarConfig::cputemp(ref b) => Box::new(CpuTemp::from_config(&b, char_width)?),
             BarConfig::memory(ref b) => Box::new(Memory::from_config(&b, char_width)?),
+            BarConfig::rainbow(ref b) => Box::new(Rainbow::from_config(&b, char_width)?),
             BarConfig::stdin(ref b) => Box::new(Stdin::from_config(&b, char_width)?),
         };
 
@@ -140,6 +143,6 @@ impl<W: Write> WriteBar for W {
     }
 
     fn sep(&mut self, height: u32) -> Result<(), io::Error> {
-        write!(self, "^fg({})^r(2x{})", TEXTCOLOR, height)
+        write!(self, "^fg({})^r(2x{})", SEPARATOR_COLOR, height)
     }
 }

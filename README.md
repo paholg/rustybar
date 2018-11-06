@@ -10,10 +10,9 @@ featureful.
 It currently uses dzen2 as a backend, but may eventually be changed to do everything
 internally for increased features.
 
-Someday, this will include instructions. For now, your best bet is to look at and play
-with the config file.
-
-
+The included `example_config.toml` will be used if you do not have an existing config. It also gives
+you a walkthough on setting it up. The best way to get started with rustybar is to run it,
+generating your config file, and then play with the generated file.
 
 To build, simply run
 ```

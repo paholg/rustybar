@@ -44,7 +44,8 @@ fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
             config_path.display()
         );
         let mut file = fs::File::create(&config_path)?;
-        file.write_all(default_config())?;
+        let example_config = include_bytes!("../example_config.toml");
+        file.write_all(example_config)?;
     }
 
     // -- load config file -----------------------------------------------------
@@ -56,25 +57,11 @@ fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
     };
 
     let config: config::Config = toml::from_str(&toml_string)?;
-    debug!("Config: {:#?}", config);
-
-    // -- get dpi (fixme) ------------
-    // let dpi = get_dpi(96);
+    // debug!("Config: {:#?}", config);
 
     let font = &config.font;
     let height = config.height;
-    let _lgap = config.left_gap;
-    let _rgap = config.right_gap;
     let bg = &config.background;
-
-    // TODO: THIS IS TMEPOERERXS
-    // let bgs = vec![
-    //     "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff0000", "#00ff00",
-    //     "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
-    // ];
-    // let mut bg_iter = bgs.iter();
-
-    let char_width = char_width(font);
 
     let mut screens = Vec::new();
     let mut threads: Vec<thread::JoinHandle<_>> = Vec::new();
@@ -97,9 +84,9 @@ fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
 
         reset.store(false, atomic::Ordering::Relaxed);
 
-        let bars = config::generate_bars(&config, char_width, screens[0].width)?;
+        let bars = config::generate_bars(&config, screens[0].width)?;
 
-        let mut left = 0;
+        let mut left = config.left_gap;
         for mut bar in bars {
             let len = bar.len();
             let reset = reset.clone();
@@ -187,7 +174,6 @@ fn main() {
         };
 
         // Run!
-
         if let Err(e) = run(&config_path) {
             error!("Error: {}\nBacktrace: {}", e, e.backtrace());
         }
@@ -215,162 +201,10 @@ fn get_screens() -> Result<Vec<Screen>, failure::Error> {
     RE.captures_iter(&out)
         .map(|cap| {
             Ok(Screen {
-                width: cap[1].parse::<u32>()? - 1,
+                width: cap[1].parse::<u32>()?,
                 x: cap[2].parse()?,
                 y: cap[3].parse()?,
             })
         })
         .collect()
-}
-
-fn char_width(_font: &str) -> u32 {
-    10
-}
-
-fn default_config<'a>() -> &'a [u8] {
-    br###"
-# --- global parameters ------
-# Note: I don't currently obtain font size correctly for determining the pixel width of
-# characters, so bars that include text will not be sized correctly.
-font = "Monospace-9"
-left_gap = 20
-right_gap = 108
-height = 18
-background = "#000000"
-
-# to add:
-# wifi
-
-# --- left section ----------------
-[[left]]
-  bar = "stdin"
-  # stdin is the only bar with indeterminate length, so it must be set.
-  # However, it will include all space to its right.
-  # In this case, everything in the left section
-  # will be writable by the stdin bar
-  length = 10
-
-# --- center section --------------
-[[center]]
-  space = 20
-[[center]]
-  # the temperature of your cpu, as reported by "acpi -t"
-  bar = "cputemp"
-  width = 35
-  height = 12
-  # min and max designate the respective temperatures to use at the ends of the bar
-  # these are accepted as floating point numbers
-  min = 0.0
-  max = 100.0
-  # the colormap for a bar dictates what color it will be at each key point
-  # anywhere in between two set points will be interpolated to give a gradual change
-  # each element in the colormap is a list of the form [key, red, green, blue]
-  # where keys go from 0 (for empty) to 100 (for full)
-  colormap = [[  0,   0, 255, 255],
-              [ 40,   0, 255, 255],
-              [ 80, 255, 255,   0],
-              [100, 255,   0,   0]]
-[[center]]
-  space = 10
-[[center]]
-  # the usage of your processors, separated by physical core.
-  bar = "cpu"
-  # for something with multiple bars, like this, width designates the width of each
-  # individual bar
-  width = 20
-  # height designates the height of the bars
-  height = 10
-  # space is the space between the individual bars. It is only for things that have multiple bars.
-  space = 8
-  colormap = [[  0,  20,  20,  20],
-              [ 15,  50,  50,  50],
-              [ 30, 180, 200,  60],
-              [ 60, 200, 150,   0],
-              [100, 255,   0,   0]]
-[[center]]
-  space = 10
-[[center]]
-  # used memory
-  bar = "memory"
-  width = 35
-  height = 12
-  colormap = [[  0,   0, 255, 255],
-              [ 40,   0, 255, 255],
-              [ 80, 255, 255,   0],
-              [100, 255,   0,   0]]
-[[center]]
-  space = 20
-
-# --- right section -------------
-# positive values for space give you a space of that many pixels negative values for
-# space spread any leftover space amongst them.  For example, if you have space = -1 and
-# space = -2 at two places, then the first will get 1/3 of your leftover space and the
-# second will get 2/3 of it
-[[right]]
-  space = -3
-# [[right]]
-#   # the volume bar uses amixer to get information, so you must have alsa installed to
-#   # use it. It is not ideal, as the volume is just polled every second, and when a
-#   # library exists for Rust, a better interface for volume will be implemented
-#   bar = "volume"
-#   width = 30
-#   height = 10
-#   colormap = [[  0, 150, 100, 255],
-#               [100,   0, 255, 255]]
-#   # the volume bar will change to this color when muted
-#   mute_color = "#b000b0"
-#   # the number of the sound card to use
-#   card = 0
-#   channel = "Master"
-# [[right]]
-#   space = 20
-[[right]]
-  # screen brightness. Probably only for laptops
-  bar = "brightness"
-  width = 30
-  height = 10
-  colormap = [[  0, 255, 255, 255],
-              [100, 128, 128, 128]]
-[[right]]
-  space = 20
-[[right]]
-  # battery bar, only for laptops
-  bar = "battery"
-  width = 30
-  height = 10
-  space = 8
-  # some laptops have multiple batteries, so you could include more
-  battery_number = 0
-  colormap = [[  0, 255,   0,   0],
-              [ 35, 255, 255,   0],
-              [100,   0, 255,   0]]
-[[right]]
-  space = -3
-
-# "test" is useful for viewing colormaps. This one will give you a rainbow.
-# [[right]]
-#   bar = "test"
-#   width = 100
-#   colormap = [[  0, 255,   0,   0],
-#               [ 20, 255, 255,   0],
-#               [ 40,   0, 255,   0],
-#               [ 60,   0, 255, 255],
-#               [ 80,   0,   0, 255],
-#               [100, 255,   0, 255]]
-# [[right]]
-#   space = -2
-[[right]]
-  # I like my date and clock to be different colors, so I have two clock bars.
-  bar = "clock"
-  # This format string gives the date. See "man date" for more options.
-  format = "%a %Y-%m-%d"
-  color = "#3cb371"
-[[right]]
-  space = 20
-[[right]]
-  bar = "clock"
-  format = "%H:%M:%S"
-  color = "#50e0ff"
-
-"###
 }

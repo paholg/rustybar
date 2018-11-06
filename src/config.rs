@@ -5,6 +5,7 @@ use failure;
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub font: String,
+    pub char_width: u32,
     pub left_gap: u32,
     pub right_gap: u32,
     pub height: u32,
@@ -35,17 +36,17 @@ enum Entry {
     Space(i32),
 }
 
-pub fn generate_bars(
-    config: &Config,
-    char_width: u32,
-    total_width: u32,
-) -> Result<Vec<BarWithSep>, failure::Error> {
-    let center = configs_to_bars(&config.center, char_width, None)?;
+pub fn generate_bars(config: &Config, total_width: u32) -> Result<Vec<BarWithSep>, failure::Error> {
+    let center = configs_to_bars(&config.center, config.char_width, None)?;
     let center_len: u32 = center.iter().map(|b| b.len()).sum();
-    let left_space = (total_width - center_len) / 2;
-    let right_space = (total_width - center_len + 1) / 2;
-    let mut left = configs_to_bars(&config.left, char_width, Some(left_space))?;
-    let right = configs_to_bars(&config.right, char_width, Some(right_space))?;
+    let left_space = (total_width - center_len) / 2 - config.left_gap;
+    let right_space = (total_width - center_len + 1) / 2 - config.right_gap;
+    debug!(
+        "total: {}, center: {}, left: {}, right: {}",
+        total_width, center_len, left_space, right_space
+    );
+    let mut left = configs_to_bars(&config.left, config.char_width, Some(left_space))?;
+    let right = configs_to_bars(&config.right, config.char_width, Some(right_space))?;
     left.extend(center);
     left.extend(right);
     Ok(left)
@@ -122,8 +123,9 @@ fn entries_to_bars(
     let dynamic_space_remainder = if dynamic_space_denom == 0 {
         0
     } else {
-        space_remaining - ((space_remaining) / dynamic_space_denom * dynamic_space_denom)
+        space_remaining - (space_remaining / dynamic_space_denom * dynamic_space_denom)
     };
+    debug!("Dynamic remainder: {}", dynamic_space_remainder);
 
     if space_available.is_none() && dynamic_space_denom > 0 {
         bail!("Cannot use dynamic space on the center bar.");
