@@ -1,10 +1,9 @@
-use colormap::{ColorMap, ColorMapConfig};
+use crate::colormap::{ColorMap, ColorMapConfig};
 
 use failure;
-use std::{fs, process, io::Read, io::Write, path::PathBuf};
-use std::time::Duration;
+use std::{fs, io::Read, io::Write, path::PathBuf};
 
-use bar::{write_one_bar, write_space, StatusBar};
+use crate::bar::{Bar, WriteBar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct BatteryConfig {
@@ -26,11 +25,9 @@ pub struct Battery {
     cmap: ColorMap,
     // the size of bars and spaces between them
     char_width: u32,
-    pub width: u32,
-    pub space: u32,
-    pub height: u32,
-    pub lspace: u32,
-    pub rspace: u32,
+    width: u32,
+    space: u32,
+    height: u32,
 }
 
 impl Battery {
@@ -38,15 +35,13 @@ impl Battery {
         let (path_capacity, path_status) = Battery::paths(config.battery_number)?;
         Ok(Battery {
             bat_num: config.battery_number,
-            path_capacity: path_capacity,
-            path_status: path_status,
+            path_capacity,
+            path_status,
             cmap: ColorMap::from_config(&config.colormap)?,
-            char_width: char_width,
+            char_width,
             width: config.width,
             space: config.space,
             height: config.height,
-            lspace: 0,
-            rspace: 0,
         })
     }
 
@@ -80,61 +75,41 @@ impl Battery {
     }
 }
 
-impl StatusBar for Battery {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-        loop {
-            let cap_string = {
-                let mut string = String::new();
-                fs::File::open(&self.path_capacity)?.read_to_string(&mut string)?;
-                string
-            };
-            let capacity: u8 = cap_string.trim().parse()?;
-
-            write_space(w, self.lspace)?;
-            write_one_bar(
-                w,
-                (capacity as f32) / 100.,
-                self.cmap.map(capacity),
-                self.width,
-                self.height,
-            )?;
-            write_space(w, self.space)?;
-
-            let status_string = {
-                let mut string = String::new();
-                fs::File::open(&self.path_status)?.read_to_string(&mut string)?;
-                string
-            };
-
-            let status = match status_string.trim() {
-                "Charging" => "^fg(#00ff00)+",
-                "Discharging" => "^fg(#ff0000)-",
-                "Full" => " ",
-                _ => "^fg(#ff0000)*",
-            };
-            w.write(status.as_bytes())?;
-            write_space(w, self.rspace)?;
-            w.write(b"\n")?;
-
-            ::std::thread::sleep(Duration::from_secs(1));
-        }
-    }
-
+impl Bar for Battery {
     fn len(&self) -> u32 {
-        let len = self.lspace + self.width + self.space + self.char_width + self.rspace;
-        println!("bat {} len {}", self.bat_num, len);
-        len
+        self.width + self.space + self.char_width
     }
 
-    fn get_lspace(&self) -> u32 {
-        self.lspace
-    }
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        let cap_string = {
+            let mut string = String::new();
+            fs::File::open(&self.path_capacity)?.read_to_string(&mut string)?;
+            string
+        };
+        let capacity: u8 = cap_string.trim().parse()?;
 
-    fn set_lspace(&mut self, lspace: u32) {
-        self.lspace = lspace
-    }
+        w.bar(
+            f32::from(capacity) / 100.,
+            self.cmap.map(capacity),
+            self.width,
+            self.height,
+        )?;
+        w.space(self.space)?;
 
-    fn set_rspace(&mut self, rspace: u32) {
-        self.rspace = rspace
+        let status_string = {
+            let mut string = String::new();
+            fs::File::open(&self.path_status)?.read_to_string(&mut string)?;
+            string
+        };
+
+        let status = match status_string.trim() {
+            "Charging" => "^fg(#00ff00)+",
+            "Discharging" => "^fg(#ff0000)-",
+            "Full" => " ",
+            _ => "^fg(#00ffff)*",
+        };
+        w.write_all(status.as_bytes())?;
+
+        Ok(())
     }
 }

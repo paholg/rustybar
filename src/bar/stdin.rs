@@ -1,7 +1,7 @@
 use failure;
-use std::{io, process, io::{BufRead, Write}};
+use std::{io, io::Write};
 
-use bar::{write_space, StatusBar};
+use crate::bar::{Bar, Writer};
 
 #[derive(Debug, Deserialize)]
 pub struct StdinConfig {
@@ -13,50 +13,37 @@ pub struct StdinConfig {
 pub struct Stdin {
     length: u32,
     char_width: u32,
-    lspace: u32,
-    rspace: u32,
+    buffer: String,
 }
 
 impl Stdin {
     pub fn from_config(config: &StdinConfig, char_width: u32) -> Result<Stdin, failure::Error> {
         Ok(Stdin {
             length: config.length,
-            char_width: char_width,
-            lspace: 0,
-            rspace: 0,
+            char_width,
+            buffer: String::new(),
         })
     }
 }
 
-impl StatusBar for Stdin {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-        let stdin = io::stdin();
-        let handle = stdin.lock();
+impl Bar for Stdin {
+    fn len(&self) -> u32 {
+        self.length * self.char_width
+    }
 
-        for line in handle.lines() {
-            let line = line?;
-            write_space(w, self.lspace)?;
-            w.write(line.as_bytes())?;
-            write_space(w, self.rspace)?;
-            w.write(b"\n")?;
-        }
-
+    // This bar is a bit unusual, and the blocking happens in the `write` function.
+    fn block(&mut self) -> Result<(), failure::Error> {
         Ok(())
     }
 
-    fn len(&self) -> u32 {
-        self.lspace + self.length * self.char_width + self.rspace
-    }
+    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
+        self.buffer.clear();
+        io::stdin().read_line(&mut self.buffer)?;
 
-    fn get_lspace(&self) -> u32 {
-        self.lspace
-    }
+        w.write_all(b"^tw()")?;
+        // Skip the final new line as that is provided by `BarWithSep`
+        w.write_all(self.buffer[0..self.buffer.len() - 1].as_bytes())?;
 
-    fn set_lspace(&mut self, lspace: u32) {
-        self.lspace = lspace
-    }
-
-    fn set_rspace(&mut self, rspace: u32) {
-        self.rspace = rspace
+        Ok(())
     }
 }

@@ -15,14 +15,13 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-use statusbar::*;
 use colormap::ColorMap;
-use std::old_io::File;
+use statusbar::*;
 use std::old_io::fs::PathExtensions;
-use std::old_io::timer;
-use std::time::Duration;
 use std::old_io::pipe;
-
+use std::old_io::timer;
+use std::old_io::File;
+use std::time::Duration;
 
 /// A statusbar for network connection information. All data is gathered from '/sys/class/net/'
 pub struct NetworkBar {
@@ -49,25 +48,25 @@ impl NetworkBar {
     }
 }
 
-impl StatusBar for NetworkBar {
-    fn initialize(&mut self, char_width: uint) {
-        self.char_width = char_width;
-        // set paths
-    }
-    fn run(&self, mut stream: Box<pipe::PipeStream>) {
-        loop {
-            write_space(&mut *stream, self.lspace);
-            timer::sleep(Duration::seconds(1));
-        }
-    }
-    fn set_colormap(&mut self, cmap: Box<ColorMap>) {
-        self.cmap = *cmap;
-    }
-    fn len(&self) -> uint {
-        self.lspace + self.width + self.space + self.char_width
-    }
-    fn get_lspace(&self) -> uint { self.lspace }
-    fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
-    fn set_width(&mut self, width: uint) { self.width = width }
-    fn set_height(&mut self, height: uint) { self.height = height }
-}
+// impl StatusBar for NetworkBar {
+//     fn initialize(&mut self, char_width: uint) {
+//         self.char_width = char_width;
+//         // set paths
+//     }
+//     fn run(&self, mut stream: Box<pipe::PipeStream>) {
+//         loop {
+//             write_space(&mut *stream, self.lspace);
+//             timer::sleep(Duration::seconds(1));
+//         }
+//     }
+//     fn set_colormap(&mut self, cmap: Box<ColorMap>) {
+//         self.cmap = *cmap;
+//     }
+//     fn len(&self) -> uint {
+//         self.lspace + self.width + self.space + self.char_width
+//     }
+//     fn get_lspace(&self) -> uint { self.lspace }
+//     fn set_lspace(&mut self, lspace: uint) { self.lspace = lspace }
+//     fn set_width(&mut self, width: uint) { self.width = width }
+//     fn set_height(&mut self, height: uint) { self.height = height }
+// }

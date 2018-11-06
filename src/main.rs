@@ -1,153 +1,225 @@
-extern crate chrono;
-extern crate directories;
 #[macro_use]
 extern crate failure;
-extern crate inotify;
-extern crate regex;
-extern crate serde;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate structopt;
-extern crate toml;
+extern crate slog_scope;
+#[macro_use(slog_o, slog_debug, slog_info, slog_warn, slog_error)]
+extern crate slog;
 
-use std::{fs, process, thread, io::{Read, Write}};
-use std::str::FromStr;
+use directories;
+use regex;
+use slog::Drain;
+use std::{
+    fs,
+    io::{Read, Write},
+    process,
+    sync::{atomic, Arc},
+    thread,
+};
+use structopt::StructOpt;
+use toml;
 
 // use structopt::StructOpt;
 
 mod bar;
+mod color;
 mod colormap;
 mod config;
+
+use crate::bar::Bar;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rustybar", about = "A simple statusbar program.")]
 struct Opt {}
 
-fn run() -> Result<(), failure::Error> {
-    let project_dirs = directories::ProjectDirs::from("", "", "rustybar");
-    let config_dir = project_dirs.config_dir();
-    let config_path = config_dir.join("config.toml");
+fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
+    // -- Populate default config ----------------------------------------------
 
     if !config_path.is_file() {
-        println!(
-            "You do not have an existing config file. Creating and populating: {}",
+        info!(
+            "You do not have an existing config file. Creating and populating '{}'",
             config_path.display()
         );
         let mut file = fs::File::create(&config_path)?;
         file.write_all(default_config())?;
     }
 
-    // -- load config file -------------------------------------------
-    assert!(config_path.is_file(), "config path bad!!");
+    // -- load config file -----------------------------------------------------
+    ensure!(config_path.is_file(), "config path bad!!");
     let toml_string = {
         let mut toml_string = String::new();
         fs::File::open(&config_path)?.read_to_string(&mut toml_string)?;
         toml_string
     };
 
-    // let config: toml::Value = toml::from_str(&toml_string)?;
-    // println!("Config: {:#?}", config);
-
     let config: config::Config = toml::from_str(&toml_string)?;
-    println!("Config: {:#?}", config);
+    debug!("Config: {:#?}", config);
 
-    // -- get resolution and dpi (fixme) ------------
+    // -- get dpi (fixme) ------------
     // let dpi = get_dpi(96);
-    let res = get_resolution()?;
 
-    let font = config.font;
+    let font = &config.font;
     let height = config.height;
-    let lgap = config.left_gap;
-    let rgap = config.right_gap;
-    let bg = config.background;
+    let _lgap = config.left_gap;
+    let _rgap = config.right_gap;
+    let bg = &config.background;
 
     // TODO: THIS IS TMEPOERERXS
-    let bgs = vec![
-        "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff0000", "#00ff00",
-        "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
-    ];
-    let mut bg_iter = bgs.iter();
+    // let bgs = vec![
+    //     "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff0000", "#00ff00",
+    //     "#0000ff", "#ffff00", "#ff00ff", "#00ffff",
+    // ];
+    // let mut bg_iter = bgs.iter();
 
-    let char_width = char_width(&font);
+    let char_width = char_width(font);
 
-    let bars = {
-        let center = config::entries_to_bars(&config.center, char_width, None)?;
-        let center_len: u32 = center.iter().map(|b| b.len()).sum();
-        let left_space = (res - center_len) / 2;
-        let right_space = (res - center_len + 1) / 2;
-        println!("c: {}, l: {}, r: {}", center_len, left_space, right_space);
-        let mut left = config::entries_to_bars(&config.left, char_width, Some(left_space))?;
-        let right = config::entries_to_bars(&config.right, char_width, Some(right_space))?;
-        left.extend(center);
-        left.extend(right);
-        left
-    };
+    let mut screens = Vec::new();
+    let mut threads: Vec<thread::JoinHandle<_>> = Vec::new();
+    let reset = Arc::new(atomic::AtomicBool::new(true));
 
-    let mut threads = Vec::new();
-    let mut left = 0;
-    for bar in bars {
-        println!("Left: {}, Bar len: {}", left, bar.len());
-        let len = bar.len();
-        {
-            let font = font.clone();
-            let left = left.clone();
-            let bg = bg.clone();
-            // let bg = bg_iter.next().unwrap().clone();
-            let handler = thread::spawn(move || {
-                let process = process::Command::new("dzen2")
-                    .args(&[
-                        "-fn",
-                        &font,
-                        "-x",
-                        &left.to_string(),
-                        "-w",
-                        &bar.len().to_string(),
-                        "-h",
-                        &height.to_string(),
-                        "-bg",
-                        &bg,
-                        "-ta",
-                        "l",
-                        "-e",
-                        "onstart=lower",
-                    ])
-                    .stdin(process::Stdio::piped())
-                    .spawn()
-                    .unwrap();
-                bar.run(&mut process.stdin.unwrap()).unwrap();
-            });
-            threads.push(handler);
+    loop {
+        let new_screens = get_screens()?;
+        if new_screens == screens {
+            thread::sleep(std::time::Duration::from_secs(1));
+            continue;
         }
-        left += len;
+        std::mem::replace(&mut screens, new_screens);
+
+        reset.store(true, atomic::Ordering::Relaxed);
+
+        for thread in threads {
+            thread.join().unwrap()?;
+        }
+        threads = Vec::new();
+
+        reset.store(false, atomic::Ordering::Relaxed);
+
+        let bars = config::generate_bars(&config, char_width, screens[0].width)?;
+
+        let mut left = 0;
+        for mut bar in bars {
+            let len = bar.len();
+            let reset = reset.clone();
+            {
+                let font = font.clone();
+                let left = left;
+                let bg = bg.clone();
+                let handler = thread::spawn(move || -> Result<(), failure::Error> {
+                    let process = process::Command::new("dzen2")
+                        .args(&[
+                            "-dock",
+                            "-fn",
+                            &font,
+                            "-x",
+                            &left.to_string(),
+                            "-w",
+                            &(bar.len()).to_string(),
+                            "-h",
+                            &height.to_string(),
+                            "-bg",
+                            &bg,
+                            "-ta",
+                            "l",
+                            "-e",
+                            "onstart=lower",
+                            "-xs",
+                            "0",
+                        ])
+                        .stdin(process::Stdio::piped())
+                        .spawn()
+                        .unwrap();
+                    let mut child_stdin = &mut process.stdin.unwrap();
+                    bar.initialize()?;
+                    loop {
+                        if let Err(e) = bar.write(&mut child_stdin).and_then(|_| bar.block()) {
+                            error!("{}", e);
+                        }
+                        if reset.load(atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                    }
+                    Ok(())
+                });
+
+                threads.push(handler);
+            }
+            left += len;
+        }
     }
-
-    ::std::thread::sleep(std::time::Duration::from_secs(100000000000));
-    // for thread in threads {
-    //     thread.join()?;
-    // }
-
-    Ok(())
 }
 
 fn main() {
-    match run() {
+    let project_dirs = directories::ProjectDirs::from("", "", "rustybar");
+    let config_dir = project_dirs.config_dir();
+    let config_path = config_dir.join("config.toml");
+    let log_path = config_dir.join("log");
+
+    // -- setup logging --------------------------------------------------------
+    let _guard = {
+        let log_file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(log_path)
+            .unwrap();
+        let drain_file = {
+            let decorator = slog_term::PlainDecorator::new(log_file);
+            let drain = slog_term::FullFormat::new(decorator).build().fuse();
+            slog_async::Async::new(drain).build().fuse()
+        };
+
+        let drain_stdout = {
+            let decorator = slog_term::TermDecorator::new().build();
+            let drain = slog_term::FullFormat::new(decorator).build().fuse();
+            slog_async::Async::new(drain).build().fuse()
+        };
+
+        let drain = slog::Duplicate::new(drain_file, drain_stdout).fuse();
+        let log = slog::Logger::root(drain, slog_o!());
+
+        slog_scope::set_global_logger(log)
+    };
+
+    // Run!
+
+    match run(&config_path) {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("Error: {}\n{}", e, e.backtrace());
+            error!("Error: {}\n{}", e, e.backtrace());
             std::process::exit(1);
         }
     }
 }
 
-fn get_resolution() -> Result<u32, failure::Error> {
-    let output = std::process::Command::new("xrandr").output()?.stdout;
-    let out = String::from_utf8(output)?;
+#[derive(Debug, Eq, PartialEq)]
+struct Screen {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+}
 
-    let re = regex::Regex::new(r"current\s(\d+)\sx\s\d+")?;
-    let cap = re.captures_iter(&out).nth(0).unwrap();
-    let res: u32 = FromStr::from_str(&cap[1])?;
-    Ok(res)
+fn get_screens() -> Result<Vec<Screen>, failure::Error> {
+    lazy_static! {
+        static ref RE: regex::Regex = regex::Regex::new(r"\d:.* (\d+).*+(\d+)+(\d+)").unwrap();
+    }
+
+    let output = std::process::Command::new("xrandr")
+        .arg("--listactivemonitors")
+        .output()?
+        .stdout;
+    let out = String::from_utf8(output)?;
+    RE.captures_iter(&out)
+        .map(|cap| {
+            Ok(Screen {
+                width: cap[1].parse::<u32>()? - 1,
+                x: cap[2].parse()?,
+                y: cap[3].parse()?,
+            })
+        })
+        .collect()
 }
 
 fn char_width(_font: &str) -> u32 {
@@ -182,7 +254,7 @@ background = "#000000"
   space = 20
 [[center]]
   # the temperature of your cpu, as reported by "acpi -t"
-  bar = "cpu_temp"
+  bar = "cputemp"
   width = 35
   height = 12
   # min and max designate the respective temperatures to use at the ends of the bar
@@ -235,22 +307,22 @@ background = "#000000"
 # second will get 2/3 of it
 [[right]]
   space = -3
-[[right]]
-  # the volume bar uses amixer to get information, so you must have alsa installed to
-  # use it. It is not ideal, as the volume is just polled every second, and when a
-  # library exists for Rust, a better interface for volume will be implemented
-  bar = "volume"
-  width = 30
-  height = 10
-  colormap = [[  0, 150, 100, 255],
-              [100,   0, 255, 255]]
-  # the volume bar will change to this color when muted
-  mute_color = "#b000b0"
-  # the number of the sound card to use
-  card = 0
-  channel = "Master"
-[[right]]
-  space = 20
+# [[right]]
+#   # the volume bar uses amixer to get information, so you must have alsa installed to
+#   # use it. It is not ideal, as the volume is just polled every second, and when a
+#   # library exists for Rust, a better interface for volume will be implemented
+#   bar = "volume"
+#   width = 30
+#   height = 10
+#   colormap = [[  0, 150, 100, 255],
+#               [100,   0, 255, 255]]
+#   # the volume bar will change to this color when muted
+#   mute_color = "#b000b0"
+#   # the number of the sound card to use
+#   card = 0
+#   channel = "Master"
+# [[right]]
+#   space = 20
 [[right]]
   # screen brightness. Probably only for laptops
   bar = "brightness"
@@ -275,17 +347,17 @@ background = "#000000"
   space = -3
 
 # "test" is useful for viewing colormaps. This one will give you a rainbow.
-[[right]]
-  bar = "test"
-  width = 100
-  colormap = [[  0, 255,   0,   0],
-              [ 20, 255, 255,   0],
-              [ 40,   0, 255,   0],
-              [ 60,   0, 255, 255],
-              [ 80,   0,   0, 255],
-              [100, 255,   0, 255]]
-[[right]]
-  space = -2
+# [[right]]
+#   bar = "test"
+#   width = 100
+#   colormap = [[  0, 255,   0,   0],
+#               [ 20, 255, 255,   0],
+#               [ 40,   0, 255,   0],
+#               [ 60,   0, 255, 255],
+#               [ 80,   0,   0, 255],
+#               [100, 255,   0, 255]]
+# [[right]]
+#   space = -2
 [[right]]
   # I like my date and clock to be different colors, so I have two clock bars.
   bar = "clock"

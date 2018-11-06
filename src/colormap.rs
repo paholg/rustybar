@@ -1,62 +1,14 @@
 use failure;
 
-use std::fmt;
-
-/// An RGB triplet
-#[derive(Copy, Clone, Debug, Deserialize)]
-pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-impl Color {
-    /// creates a Color object, guaranteeing that the colors are acceptable values.
-    pub fn new(red: u8, green: u8, blue: u8) -> Color {
-        Color {
-            r: red,
-            g: green,
-            b: blue,
-        }
-    }
-
-    // /// expects a color in the format "#ffffff"
-    // // fixme: This should be part of the FromStr trait.
-    // pub fn from_str(color: &str) -> Color {
-    //     assert!(color.len() == 7, "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
-    //     let mut c = color.chars();
-    //     let hash = c.nth(0).unwrap();
-    //     assert!(hash == '#', "Color::from_str(color) demands an argument in the format \"#ffffff\". You supplied: {}", color);
-    //     let num = u32::from_str_radix(&color[1..7], 16).unwrap();
-    //     let red = num >> 16;
-    //     let green = (num >> 8) & 255;
-    //     let blue = num & 255;
-    //     Color {
-    //         r: red as u8,
-    //         g: green as u8,
-    //         b: blue as u8,
-    //     }
-    // }
-}
-
-impl fmt::Display for Color {
-    /// Color triplets will be printed in the form #ffffff
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
-    }
-}
+use crate::color::Color;
 
 #[derive(Debug, Deserialize)]
-pub struct ColorMapConfig(Vec<Vec<u8>>);
+pub struct ColorMapConfig(Vec<[u8; 4]>);
 
-impl ::std::default::Default for ColorMapConfig {
+impl std::default::Default for ColorMapConfig {
     /// A default ColorMap that goes from red to yellow to green.
     fn default() -> Self {
-        ColorMapConfig(vec![
-            vec![0, 255, 0, 0],
-            vec![35, 255, 255, 0],
-            vec![100, 0, 255, 0],
-        ])
+        ColorMapConfig(vec![[0, 255, 0, 0], [50, 255, 255, 0], [100, 0, 255, 0]])
     }
 }
 
@@ -71,60 +23,33 @@ pub struct ColorMap {
     values: Vec<u8>,
 }
 
-impl ColorMap {
-    // /// Creates a new colormap. To start, it maps 0 to black and 100 to white, but these
-    // /// values are changeable.
-    // pub fn new() -> ColorMap {
-    //     ColorMap {
-    //         colors: vec![Color::new(0, 0, 0), Color::new(255, 255, 255)],
-    //         values: vec![0, 100],
-    //     }
-    // }
-
-    pub fn from_config(config: &ColorMapConfig) -> Result<ColorMap, failure::Error> {
-        if !config.0.iter().all(|v| v.len() == 4) {
-            bail!("Invalid colormap. Each row must have four values");
+impl<'a> std::iter::FromIterator<&'a [u8; 4]> for ColorMap {
+    /// Convert an iterator of 4 element arrays to a ColorMap. The first element in each array is
+    /// treated as the value, and the last 3 as an RGB triplet.
+    fn from_iter<I: IntoIterator<Item = &'a [u8; 4]>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let mut values = vec![];
+        let mut colors = vec![];
+        for &[v, r, g, b] in iter {
+            values.push(v);
+            colors.push(Color::new(r, g, b));
         }
+        ColorMap { values, colors }
+    }
+}
+
+impl ColorMap {
+    pub fn from_config(config: &ColorMapConfig) -> Result<ColorMap, failure::Error> {
         if let Some(v) = config.0.iter().find(|v| v[0] > 100) {
             bail!("Invalid colormap. Value {} must be in range [0, 100]", v[0]);
         }
 
-        let values = config.0.iter().map(|v| v[0]).collect();
-        let colors = config
-            .0
-            .iter()
-            .map(|v| Color::new(v[1], v[2], v[3]))
-            .collect();
-
-        Ok(ColorMap { values, colors })
+        Ok(config.0.iter().collect())
     }
 
-    // /// Adds a (value, color) pair to the colormap. Value must be in the range
-    // /// [0,100]. If the value already exists, then it will override the corresponding
-    // /// color.
-    // pub fn add_pair(&mut self, val: u8, color: Color) {
-    //     assert!(
-    //         val <= 100,
-    //         "Value {} outside of range. Must be in [0,100].",
-    //         val
-    //     );
-    //     let mut i = 0;
-    //     loop {
-    //         if self.values[i] == val {
-    //             self.colors[i] = color;
-    //             break;
-    //         } else if self.values[i] > val {
-    //             self.values.insert(i, val);
-    //             self.colors.insert(i, color);
-    //             break;
-    //         }
-    //         i += 1;
-    //     }
-    // }
-
     /// This does the interpolation, and gives you the color corresponding to the value
-    /// called with, as dicated by the color map. Should throw an error if index is not
-    /// in the range [0, 100].
+    /// called with, as dicated by the color map.
+    /// Panics if val is not in the range [0, 100].
     pub fn map(&self, val: u8) -> Color {
         assert!(
             val <= 100,
@@ -136,16 +61,15 @@ impl ColorMap {
             i += 1;
         }
         let lower: f32 =
-            ((self.values[i] - val) as f32) / ((self.values[i] - self.values[i - 1]) as f32);
+            f32::from(self.values[i] - val) / f32::from(self.values[i] - self.values[i - 1]);
         let upper: f32 =
-            ((val - self.values[i - 1]) as f32) / ((self.values[i] - self.values[i - 1]) as f32);
+            f32::from(val - self.values[i - 1]) / f32::from(self.values[i] - self.values[i - 1]);
 
-        let red: u8 =
-            (lower * (self.colors[i - 1].r as f32) + upper * (self.colors[i].r as f32)) as u8;
-        let green: u8 =
-            (lower * (self.colors[i - 1].g as f32) + upper * (self.colors[i].g as f32)) as u8;
-        let blue: u8 =
-            (lower * (self.colors[i - 1].b as f32) + upper * (self.colors[i].b as f32)) as u8;
+        let interpolate = |c1, c2| (lower * (f32::from(c1)) + upper * f32::from(c2)) as u8;
+        let red: u8 = interpolate(self.colors[i - 1].r, self.colors[i].r);
+        let green: u8 = interpolate(self.colors[i - 1].g, self.colors[i].g);
+        let blue: u8 = interpolate(self.colors[i - 1].b, self.colors[i].b);
+
         Color {
             r: red,
             g: green,
