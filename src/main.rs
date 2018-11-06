@@ -158,40 +158,41 @@ fn main() {
     let log_path = config_dir.join("log");
 
     // -- setup logging --------------------------------------------------------
-    let _guard = {
-        let log_file = fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(log_path)
-            .unwrap();
-        let drain_file = {
-            let decorator = slog_term::PlainDecorator::new(log_file);
-            let drain = slog_term::FullFormat::new(decorator).build().fuse();
-            slog_async::Async::new(drain).build().fuse()
+
+    {
+        // _guard needs to be in a smaller scope so that it is dropped before `exit`
+        let _guard = {
+            let log_file = fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(log_path)
+                .unwrap();
+            let drain_file = {
+                let decorator = slog_term::PlainDecorator::new(log_file);
+                let drain = slog_term::FullFormat::new(decorator).build().fuse();
+                slog_async::Async::new(drain).build().fuse()
+            };
+
+            let drain_stdout = {
+                let decorator = slog_term::TermDecorator::new().build();
+                let drain = slog_term::FullFormat::new(decorator).build().fuse();
+                slog_async::Async::new(drain).build().fuse()
+            };
+
+            let drain = slog::Duplicate::new(drain_file, drain_stdout).fuse();
+            let log = slog::Logger::root(drain, slog_o!());
+
+            slog_scope::set_global_logger(log)
         };
 
-        let drain_stdout = {
-            let decorator = slog_term::TermDecorator::new().build();
-            let drain = slog_term::FullFormat::new(decorator).build().fuse();
-            slog_async::Async::new(drain).build().fuse()
-        };
+        // Run!
 
-        let drain = slog::Duplicate::new(drain_file, drain_stdout).fuse();
-        let log = slog::Logger::root(drain, slog_o!());
-
-        slog_scope::set_global_logger(log)
-    };
-
-    // Run!
-
-    match run(&config_path) {
-        Ok(()) => {}
-        Err(e) => {
-            error!("Error: {}\n{}", e, e.backtrace());
-            std::process::exit(1);
+        if let Err(e) = run(&config_path) {
+            error!("Error: {}\nBacktrace: {}", e, e.backtrace());
         }
     }
+    std::process::exit(1);
 }
 
 #[derive(Debug, Eq, PartialEq)]

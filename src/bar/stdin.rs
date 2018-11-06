@@ -8,7 +8,7 @@ pub struct StdinConfig {
     length: u32,
 }
 
-/// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
+/// A statusbar for stdin.
 #[derive(Debug)]
 pub struct Stdin {
     length: u32,
