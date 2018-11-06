@@ -18,3 +18,9 @@ To build, simply run
 ```
 Cargo build --release
 ```
+
+# Known Issues
+
+* Rustybar will automatically resize if your resolution changes. However, it waits for threads to
+  join first. The brightness bar blocks until brightness changes. So, on resolution change, rustybar
+  will be broken until your brightness changes if using that bar.
