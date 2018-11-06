@@ -7,6 +7,8 @@ extern crate serde_derive;
 
 use directories;
 use regex;
+use slog::{slog_debug, slog_error, slog_info, slog_o, slog_warn, Drain};
+use slog_scope::{debug, error, info, warn};
 use std::{
     fs,
     io::{Read, Write},
@@ -30,33 +32,28 @@ use crate::bar::Bar;
 #[structopt(name = "rustybar", about = "A simple statusbar program.")]
 struct Opt {}
 
-fn run() -> Result<(), failure::Error> {
-    let project_dirs = directories::ProjectDirs::from("", "", "rustybar");
-    let config_dir = project_dirs.config_dir();
-    let config_path = config_dir.join("config.toml");
+fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
+    // -- Populate default config ----------------------------------------------
 
     if !config_path.is_file() {
-        println!(
-            "You do not have an existing config file. Creating and populating: {}",
+        info!(
+            "You do not have an existing config file. Creating and populating '{}'",
             config_path.display()
         );
         let mut file = fs::File::create(&config_path)?;
         file.write_all(default_config())?;
     }
 
-    // -- load config file -------------------------------------------
-    assert!(config_path.is_file(), "config path bad!!");
+    // -- load config file -----------------------------------------------------
+    ensure!(config_path.is_file(), "config path bad!!");
     let toml_string = {
         let mut toml_string = String::new();
         fs::File::open(&config_path)?.read_to_string(&mut toml_string)?;
         toml_string
     };
 
-    // let config: toml::Value = toml::from_str(&toml_string)?;
-    // println!("Config: {:#?}", config);
-
     let config: config::Config = toml::from_str(&toml_string)?;
-    println!("Config: {:#?}", config);
+    debug!("Config: {:#?}", config);
 
     // -- get dpi (fixme) ------------
     // let dpi = get_dpi(96);
@@ -134,8 +131,9 @@ fn run() -> Result<(), failure::Error> {
                     let mut child_stdin = &mut process.stdin.unwrap();
                     bar.initialize()?;
                     loop {
-                        bar.write(&mut child_stdin)?;
-                        bar.block()?;
+                        if let Err(e) = bar.write(&mut child_stdin).and_then(|_| bar.block()) {
+                            error!("{}", e);
+                        }
                         if reset.load(atomic::Ordering::Relaxed) {
                             break;
                         }
@@ -153,10 +151,43 @@ fn run() -> Result<(), failure::Error> {
 }
 
 fn main() {
-    match run() {
+    let project_dirs = directories::ProjectDirs::from("", "", "rustybar");
+    let config_dir = project_dirs.config_dir();
+    let config_path = config_dir.join("config.toml");
+    let log_path = config_dir.join("log");
+
+    // -- setup logging --------------------------------------------------------
+    let _guard = {
+        let log_file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(log_path)
+            .unwrap();
+        let drain_file = {
+            let decorator = slog_term::PlainDecorator::new(log_file);
+            let drain = slog_term::FullFormat::new(decorator).build().fuse();
+            slog_async::Async::new(drain).build().fuse()
+        };
+
+        let drain_stdout = {
+            let decorator = slog_term::TermDecorator::new().build();
+            let drain = slog_term::FullFormat::new(decorator).build().fuse();
+            slog_async::Async::new(drain).build().fuse()
+        };
+
+        let drain = slog::Duplicate::new(drain_file, drain_stdout).fuse();
+        let log = slog::Logger::root(drain, slog_o!());
+
+        slog_scope::set_global_logger(log)
+    };
+
+    // Run!
+
+    match run(&config_path) {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("Error: {}\n{}", e, e.backtrace());
+            error!("Error: {}\n{}", e, e.backtrace());
             std::process::exit(1);
         }
     }
@@ -222,7 +253,7 @@ background = "#000000"
   space = 20
 [[center]]
   # the temperature of your cpu, as reported by "acpi -t"
-  bar = "cpu_temp"
+  bar = "cputemp"
   width = 35
   height = 12
   # min and max designate the respective temperatures to use at the ends of the bar
@@ -275,22 +306,22 @@ background = "#000000"
 # second will get 2/3 of it
 [[right]]
   space = -3
-[[right]]
-  # the volume bar uses amixer to get information, so you must have alsa installed to
-  # use it. It is not ideal, as the volume is just polled every second, and when a
-  # library exists for Rust, a better interface for volume will be implemented
-  bar = "volume"
-  width = 30
-  height = 10
-  colormap = [[  0, 150, 100, 255],
-              [100,   0, 255, 255]]
-  # the volume bar will change to this color when muted
-  mute_color = "#b000b0"
-  # the number of the sound card to use
-  card = 0
-  channel = "Master"
-[[right]]
-  space = 20
+# [[right]]
+#   # the volume bar uses amixer to get information, so you must have alsa installed to
+#   # use it. It is not ideal, as the volume is just polled every second, and when a
+#   # library exists for Rust, a better interface for volume will be implemented
+#   bar = "volume"
+#   width = 30
+#   height = 10
+#   colormap = [[  0, 150, 100, 255],
+#               [100,   0, 255, 255]]
+#   # the volume bar will change to this color when muted
+#   mute_color = "#b000b0"
+#   # the number of the sound card to use
+#   card = 0
+#   channel = "Master"
+# [[right]]
+#   space = 20
 [[right]]
   # screen brightness. Probably only for laptops
   bar = "brightness"
@@ -315,17 +346,17 @@ background = "#000000"
   space = -3
 
 # "test" is useful for viewing colormaps. This one will give you a rainbow.
-[[right]]
-  bar = "test"
-  width = 100
-  colormap = [[  0, 255,   0,   0],
-              [ 20, 255, 255,   0],
-              [ 40,   0, 255,   0],
-              [ 60,   0, 255, 255],
-              [ 80,   0,   0, 255],
-              [100, 255,   0, 255]]
-[[right]]
-  space = -2
+# [[right]]
+#   bar = "test"
+#   width = 100
+#   colormap = [[  0, 255,   0,   0],
+#               [ 20, 255, 255,   0],
+#               [ 40,   0, 255,   0],
+#               [ 60,   0, 255, 255],
+#               [ 80,   0,   0, 255],
+#               [100, 255,   0, 255]]
+# [[right]]
+#   space = -2
 [[right]]
   # I like my date and clock to be different colors, so I have two clock bars.
   bar = "clock"
