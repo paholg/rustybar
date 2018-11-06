@@ -4,11 +4,14 @@ extern crate failure;
 extern crate lazy_static;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate slog_scope;
+#[macro_use(slog_o, slog_debug, slog_info, slog_warn, slog_error)]
+extern crate slog;
 
 use directories;
 use regex;
-use slog::{slog_debug, slog_error, slog_info, slog_o, Drain};
-use slog_scope::{debug, error, info};
+use slog::Drain;
 use std::{
     fs,
     io::{Read, Write},

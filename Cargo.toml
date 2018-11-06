@@ -6,6 +6,7 @@
 
 [dependencies]
   chrono = "*"
+  debug_stub_derive = "*"
   directories = "*"
   failure = "*"
   inotify = "*"

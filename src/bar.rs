@@ -33,7 +33,7 @@ pub trait Bar: fmt::Debug + marker::Send + marker::Sync {
 
     /// Block the thread until it is time to produce the next output. Default implemention sleeps
     /// for 1 second.
-    fn block(&self) -> Result<(), failure::Error> {
+    fn block(&mut self) -> Result<(), failure::Error> {
         ::std::thread::sleep(Duration::from_secs(1));
         Ok(())
     }
@@ -69,7 +69,7 @@ impl Bar for BarWithSep {
         self.left + self.bar.len() + self.right
     }
 
-    fn block(&self) -> Result<(), failure::Error> {
+    fn block(&mut self) -> Result<(), failure::Error> {
         self.bar.block()
     }
 

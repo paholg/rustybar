@@ -2,7 +2,7 @@ use crate::colormap::{ColorMap, ColorMapConfig};
 
 use failure;
 use inotify;
-use std::{fmt, fs, io::Read, io::Write, path, process};
+use std::{fs, io::Read, io::Write, path};
 
 use crate::bar::{Bar, WriteBar, Writer};
 
@@ -14,14 +14,18 @@ pub struct BrightnessConfig {
     height: u32,
 }
 
+use debug_stub_derive::DebugStub;
 /// A statusbar for brightness information. Uses information from /sys/class/backlight/
-#[derive(Debug)]
+#[derive(DebugStub)]
 pub struct Brightness {
     path_current: path::PathBuf,
     max: f32,
     cmap: ColorMap,
     width: u32,
     height: u32,
+    #[debug_stub = "Inotify"]
+    inotify: inotify::Inotify,
+    inotify_buffer: Vec<u8>,
 }
 
 impl Brightness {
@@ -36,14 +40,18 @@ impl Brightness {
         }
 
         let mut dirs = fs::read_dir(&base_path)?;
-        // if dirs.cloned().count() > 1 {
-        //     println!("You have multiple backlight directories. They are:");
-        //     for dir in dirs {
-        //         println!("\t{}", dir?.path().display());
-        //     }
-        //     println!("I am going to use the first one. To use another, edit the configuration file (Not yet enabled.).");
-        // }
-        let path = dirs.next().unwrap()?.path();
+        let dir = dirs.next();
+        let next_dir = dirs.next();
+        if next_dir.is_some() {
+            warn!("You have multiple backlight directories. In {:?}. I am going to use the first one. To use another, edit the configuration file (Not yet enabled).", base_path);
+        }
+        if dir.is_none() {
+            bail!(
+                "No backlight directories found! I looked in {:?}",
+                base_path
+            );
+        }
+        let path = dir.unwrap()?.path();
         let path_current = path.join("brightness");
         let path_max = path.join("max_brightness");
 
@@ -55,12 +63,17 @@ impl Brightness {
 
         let max: f32 = max_string.trim().parse()?;
 
+        let mut inotify = inotify::Inotify::init()?;
+        inotify.add_watch(&path_current, inotify::WatchMask::MODIFY)?;
+
         Ok(Brightness {
             path_current,
             max,
             cmap: ColorMap::from_config(&config.colormap)?,
             width: config.width,
             height: config.height,
+            inotify,
+            inotify_buffer: vec![0; 1024],
         })
     }
 }
@@ -69,8 +82,6 @@ impl Bar for Brightness {
     fn len(&self) -> u32 {
         self.width
     }
-
-    // TODO: impl block with inotify
 
     fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
         let current_string = {
@@ -94,58 +105,10 @@ impl Bar for Brightness {
         w.write_all(b"^ca()^ca()\n")?;
         Ok(())
     }
+
+    fn block(&mut self) -> Result<(), failure::Error> {
+        self.inotify
+            .read_events_blocking(&mut self.inotify_buffer)?;
+        Ok(())
+    }
 }
-
-// impl StatusBar for Brightness {
-//     fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error> {
-//         let mut inotify = inotify::Inotify::init()?;
-//         inotify.add_watch(&self.path_current, inotify::WatchMask::MODIFY)?;
-
-//         let mut perform = || -> Result<(), failure::Error> {
-//             let current_string = {
-//                 let mut buffer = String::new();
-//                 fs::File::open(&self.path_current)?.read_to_string(&mut buffer)?;
-//                 buffer
-//             };
-//             let current: f32 = current_string.trim().parse()?;
-//             let val = current / self.max;
-
-//             write_space(w, self.lspace)?;
-//             w.write(
-//                 b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)",
-//             )?;
-//             write_one_bar(
-//                 w,
-//                 val,
-//                 self.cmap.map((val * 100.) as u8),
-//                 self.width,
-//                 self.height,
-//             )?;
-//             w.write(b"^ca()^ca()\n")?;
-//             write_space(w, self.rspace)?;
-//             Ok(())
-//         };
-
-//         let mut buffer = [0; 1024];
-//         loop {
-//             perform()?;
-//             inotify.read_events_blocking(&mut buffer)?.next();
-//         }
-//     }
-
-//     fn len(&self) -> u32 {
-//         self.lspace + self.width + self.rspace
-//     }
-
-//     fn get_lspace(&self) -> u32 {
-//         self.lspace
-//     }
-
-//     fn set_lspace(&mut self, lspace: u32) {
-//         self.lspace = lspace
-//     }
-
-//     fn set_rspace(&mut self, rspace: u32) {
-//         self.rspace = rspace
-//     }
-// }

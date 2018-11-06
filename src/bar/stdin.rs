@@ -31,7 +31,7 @@ impl Bar for Stdin {
         self.length * self.char_width
     }
 
-    fn block(&self) -> Result<(), failure::Error> {
+    fn block(&mut self) -> Result<(), failure::Error> {
         Ok(())
     }
 
