@@ -106,6 +106,8 @@ impl Bar for Brightness {
         Ok(())
     }
 
+    // Fixme: On resolution change, this will block until the brightness changes, putting rustybar
+    // in a mostly broken state until then.
     fn block(&mut self) -> Result<(), failure::Error> {
         self.inotify
             .read_events_blocking(&mut self.inotify_buffer)?;

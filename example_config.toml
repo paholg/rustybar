@@ -115,8 +115,8 @@ background = "#000000"
   colormap = [[  0, 255,   0,   0],
               [ 35, 255, 255,   0],
               [100,   0, 255,   0]]
-# [[right]]
-#   space = -3
+[[right]]
+  space = -3
 
 # Rainbow is useful for viewing colormaps. It shows what a colormap will look like, but spread out
 # in space instead of at different values.
@@ -124,7 +124,7 @@ background = "#000000"
 # This one is an actual rainbow.
 [[right]]
   bar = "rainbow"
-  width = 101
+  width = 150
   height = 12
   colormap = [[  0, 255,   0,   0],
               [ 20, 255, 255,   0],
