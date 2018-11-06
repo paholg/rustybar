@@ -92,7 +92,7 @@ impl Bar for Memory {
             self.height,
         )?;
         w.space(self.rspace)?;
-        w.write(b"\n")?;
+        w.write_all(b"\n")?;
 
         Ok(())
     }

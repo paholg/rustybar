@@ -7,46 +7,43 @@ mod memory;
 mod stdin;
 
 pub use self::{
-    battery::{Battery, BatteryConfig}, brightness::{Brightness, BrightnessConfig},
-    clock::{Clock, ClockConfig}, cpu::{Cpu, CpuConfig}, cpu_temp::{CpuTemp, CpuTempConfig},
-    memory::{Memory, MemoryConfig}, stdin::{Stdin, StdinConfig},
+    battery::{Battery, BatteryConfig},
+    brightness::{Brightness, BrightnessConfig},
+    clock::{Clock, ClockConfig},
+    cpu::{Cpu, CpuConfig},
+    cpu_temp::{CpuTemp, CpuTempConfig},
+    memory::{Memory, MemoryConfig},
+    stdin::{Stdin, StdinConfig},
 };
 
 use failure;
 use std::{fmt, io, io::Write, marker, process, time::Duration};
 
-use crate::colormap::Color;
+use crate::color::Color;
 
 pub type Writer = process::ChildStdin;
 
 // fixme: this should be settable
 static TEXTCOLOR: &'static str = "#888888";
 
-pub trait StatusBar: fmt::Debug + marker::Send + marker::Sync {
-    fn run(&self, w: &mut process::ChildStdin) -> Result<(), failure::Error>;
-    /// Give the length in pixels of the output string.
-    fn len(&self) -> u32;
-    fn get_lspace(&self) -> u32;
-    fn set_lspace(&mut self, lspace: u32);
-    fn set_rspace(&mut self, rspace: u32);
-}
-
 pub trait Bar: fmt::Debug + marker::Send + marker::Sync {
     /// Give the length in pixels of the output string. This is used to size the dzen2 bar and to
-    /// allocate space. It should never change.
+    /// allocate space. It is assumed to be constant.
     fn len(&self) -> u32;
 
-    /// Blocks the thread until it is time to produce the next output. Default implemention sleeps
+    /// Block the thread until it is time to produce the next output. Default implemention sleeps
     /// for 1 second.
     fn block(&self) -> Result<(), failure::Error> {
         ::std::thread::sleep(Duration::from_secs(1));
         Ok(())
     }
 
+    /// Any extra initialization steps can go here.
     fn initialize(&mut self) -> Result<(), failure::Error> {
         Ok(())
     }
 
+    /// Output the bar contents to the writer.
     fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error>;
 }
 
@@ -61,7 +58,7 @@ impl BarWithSep {
     pub fn new(bar: Box<dyn Bar>) -> BarWithSep {
         BarWithSep {
             left: 0,
-            bar: bar,
+            bar,
             right: 0,
         }
     }
@@ -105,15 +102,15 @@ pub enum BarConfig {
 }
 
 impl BarConfig {
-    pub fn into_bar(&self, char_width: u32) -> Result<Box<dyn Bar>, failure::Error> {
+    pub fn to_bar(&self, char_width: u32) -> Result<Box<dyn Bar>, failure::Error> {
         let bar: Box<dyn Bar> = match self {
-            &BarConfig::battery(ref b) => Box::new(Battery::from_config(&b, char_width)?),
-            &BarConfig::brightness(ref b) => Box::new(Brightness::from_config(&b, char_width)?),
-            &BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),
-            &BarConfig::cpu(ref b) => Box::new(Cpu::from_config(&b, char_width)?),
-            &BarConfig::cputemp(ref b) => Box::new(CpuTemp::from_config(&b, char_width)?),
-            &BarConfig::memory(ref b) => Box::new(Memory::from_config(&b, char_width)?),
-            &BarConfig::stdin(ref b) => Box::new(Stdin::from_config(&b, char_width)?),
+            BarConfig::battery(ref b) => Box::new(Battery::from_config(&b, char_width)?),
+            BarConfig::brightness(ref b) => Box::new(Brightness::from_config(&b, char_width)?),
+            BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),
+            BarConfig::cpu(ref b) => Box::new(Cpu::from_config(&b, char_width)?),
+            BarConfig::cputemp(ref b) => Box::new(CpuTemp::from_config(&b, char_width)?),
+            BarConfig::memory(ref b) => Box::new(Memory::from_config(&b, char_width)?),
+            BarConfig::stdin(ref b) => Box::new(Stdin::from_config(&b, char_width)?),
         };
 
         Ok(bar)

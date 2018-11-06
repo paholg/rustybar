@@ -67,8 +67,8 @@ fn configs_to_entries(
     entry_configs
         .iter()
         .map(|e| match e {
-            &EntryConfig::Space(ref s) => Ok(Entry::Space(s.space)),
-            &EntryConfig::Bar(ref b) => Ok(Entry::Bar(b.into_bar(char_width)?)),
+            EntryConfig::Space(s) => Ok(Entry::Space(s.space)),
+            EntryConfig::Bar(b) => Ok(Entry::Bar(b.to_bar(char_width)?)),
         })
         .collect()
 }
@@ -80,13 +80,15 @@ fn entries_to_bars(
 ) -> Result<Vec<BarWithSep>, failure::Error> {
     let space_used: u32 = entries
         .iter()
-        .map(|e| match e {
-            &Entry::Space(s) => if s > 0 {
-                s as u32
-            } else {
-                0
-            },
-            &Entry::Bar(ref b) => b.len(),
+        .map(|e| match *e {
+            Entry::Space(s) => {
+                if s > 0 {
+                    s as u32
+                } else {
+                    0
+                }
+            }
+            Entry::Bar(ref b) => b.len(),
         })
         .sum();
 
@@ -105,7 +107,7 @@ fn entries_to_bars(
     let dynamic_space_denom: u32 = entries
         .iter()
         .filter_map(|e| {
-            if let &Entry::Space(s) = e {
+            if let Entry::Space(s) = *e {
                 if s < 0 {
                     Some(-s as u32)
                 } else {

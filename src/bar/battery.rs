@@ -1,7 +1,7 @@
 use crate::colormap::{ColorMap, ColorMapConfig};
 
 use failure;
-use std::{fmt, fs, io::Read, io::Write, path::PathBuf, process};
+use std::{fs, io::Read, io::Write, path::PathBuf};
 
 use crate::bar::{Bar, WriteBar, Writer};
 
@@ -31,28 +31,14 @@ pub struct Battery {
 }
 
 impl Battery {
-    pub fn temp(char_width: u32) -> Result<Battery, failure::Error> {
-        let (path_capacity, path_status) = Battery::paths(0)?;
-        Ok(Battery {
-            bat_num: 0,
-            path_capacity: path_capacity,
-            path_status: path_status,
-            cmap: ColorMap::from_config(&Default::default())?,
-            char_width: char_width,
-            width: 100,
-            space: 20,
-            height: 20,
-        })
-    }
-
     pub fn from_config(config: &BatteryConfig, char_width: u32) -> Result<Battery, failure::Error> {
         let (path_capacity, path_status) = Battery::paths(config.battery_number)?;
         Ok(Battery {
             bat_num: config.battery_number,
-            path_capacity: path_capacity,
-            path_status: path_status,
+            path_capacity,
+            path_status,
             cmap: ColorMap::from_config(&config.colormap)?,
-            char_width: char_width,
+            char_width,
             width: config.width,
             space: config.space,
             height: config.height,
@@ -103,7 +89,7 @@ impl Bar for Battery {
         let capacity: u8 = cap_string.trim().parse()?;
 
         w.bar(
-            (capacity as f32) / 100.,
+            f32::from(capacity) / 100.,
             self.cmap.map(capacity),
             self.width,
             self.height,
@@ -122,8 +108,8 @@ impl Bar for Battery {
             "Full" => " ",
             _ => "^fg(#00ffff)*",
         };
-        w.write(status.as_bytes())?;
-        w.write(b"\n")?;
+        w.write_all(status.as_bytes())?;
+        w.write_all(b"\n")?;
 
         Ok(())
     }

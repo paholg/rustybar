@@ -1,5 +1,5 @@
-use crate::bar::{Bar, WriteBar, Writer};
 use chrono;
+use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
 use lazy_static;
@@ -84,16 +84,16 @@ impl Cpu {
         let len = proc_map.len();
 
         Ok(Cpu {
-            proc_map: proc_map,
+            proc_map,
             cmap: ColorMap::from_config(&config.colormap)?,
-            num_cores: num_cores,
-            procs_per_core: procs_per_core,
+            num_cores,
+            procs_per_core,
             width: config.width,
             space: config.space,
             height: config.height,
             last: chrono::Local::now(),
             old_idles: vec![0; len],
-            path: path,
+            path,
         })
     }
 }
@@ -101,7 +101,8 @@ impl Cpu {
 impl Bar for Cpu {
     fn len(&self) -> u32 {
         (self.width + self.space) * self.procs_per_core * self.num_cores
-            + (self.space + 2) * (self.num_cores + 1) - self.space
+            + (self.space + 2) * (self.num_cores + 1)
+            - self.space
     }
 
     fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
@@ -128,8 +129,10 @@ impl Bar for Cpu {
         w.sep(2 * self.height)?;
         w.space(self.space)?;
         for i in 0..idles.len() {
-            let usage = 1.0 - (idles[i] as f32 - self.old_idles[i] as f32)
-                / (dt.num_nanoseconds().unwrap() as f32) * 1e7;
+            let usage = 1.0
+                - (idles[i] as f32 - self.old_idles[i] as f32)
+                    / (dt.num_nanoseconds().unwrap() as f32)
+                    * 1e7;
             let val = if usage > 1.0 {
                 1.0
             } else if usage < 0.0 {
@@ -147,7 +150,7 @@ impl Bar for Cpu {
                 }
             }
         }
-        w.write(b"\n")?;
+        w.write_all(b"\n")?;
         self.old_idles = idles;
 
         Ok(())

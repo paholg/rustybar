@@ -25,7 +25,7 @@ impl Clock {
         let mut clock = Clock {
             color: config.color.clone(),
             format: config.format.clone(),
-            char_width: char_width,
+            char_width,
             length: 0,
         };
 
@@ -45,7 +45,7 @@ impl Bar for Clock {
     fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
         let now = chrono::Local::now();
         let text = now.format(&self.format);
-        write!(w, "^fg({}){}\n", self.color, text)?;
+        writeln!(w, "^fg({}){}", self.color, text)?;
         Ok(())
     }
 }

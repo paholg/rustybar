@@ -77,7 +77,7 @@ impl Bar for CpuTemp {
             self.width,
             self.height,
         )?;
-        w.write(b"\n")?;
+        w.write_all(b"\n")?;
         Ok(())
     }
 }

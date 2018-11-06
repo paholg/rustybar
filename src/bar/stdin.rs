@@ -1,7 +1,9 @@
 use failure;
-use std::{io,
-          io::{BufRead, Write},
-          process};
+use std::{
+    io,
+    io::{BufRead, Write},
+    process,
+};
 
 use crate::bar::{Bar, WriteBar, Writer};
 
@@ -22,7 +24,7 @@ impl Stdin {
     pub fn from_config(config: &StdinConfig, char_width: u32) -> Result<Stdin, failure::Error> {
         Ok(Stdin {
             length: config.length,
-            char_width: char_width,
+            char_width,
             buffer: String::new(),
         })
     }
@@ -42,8 +44,8 @@ impl Bar for Stdin {
         // fixme: This locks for every read.
         io::stdin().read_line(&mut self.buffer)?;
 
-        w.write(b"\n^tw()")?;
-        w.write(self.buffer.as_bytes())?;
+        w.write_all(b"\n^tw()")?;
+        w.write_all(self.buffer.as_bytes())?;
 
         Ok(())
     }

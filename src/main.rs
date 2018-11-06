@@ -1,31 +1,26 @@
-
-use directories;
 #[macro_use]
 extern crate failure;
-
-use regex;
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate structopt;
 
-use toml;
-
+use directories;
+use regex;
 use std::{
     fs,
     io::{Read, Write},
     process,
-    sync::mpsc,
     sync::{atomic, Arc},
     thread,
 };
+use structopt::StructOpt;
+use toml;
 
 // use structopt::StructOpt;
 
 mod bar;
+mod color;
 mod colormap;
 mod config;
 
@@ -110,7 +105,7 @@ fn run() -> Result<(), failure::Error> {
             let reset = reset.clone();
             {
                 let font = font.clone();
-                let left = left.clone();
+                let left = left;
                 let bg = bg.clone();
                 let handler = thread::spawn(move || -> Result<(), failure::Error> {
                     let process = process::Command::new("dzen2")

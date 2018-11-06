@@ -56,8 +56,8 @@ impl Brightness {
         let max: f32 = max_string.trim().parse()?;
 
         Ok(Brightness {
-            path_current: path_current,
-            max: max,
+            path_current,
+            max,
             cmap: ColorMap::from_config(&config.colormap)?,
             width: config.width,
             height: config.height,
@@ -81,7 +81,9 @@ impl Bar for Brightness {
         let current: f32 = current_string.trim().parse()?;
         let val = current / self.max;
 
-        w.write(b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)")?;
+        w.write_all(
+            b"^ca(1,xdotool key XF86MonBrightnessUp)^ca(3,xdotool key XF86MonBrightnessDown)",
+        )?;
 
         w.bar(
             val,
@@ -89,7 +91,7 @@ impl Bar for Brightness {
             self.width,
             self.height,
         )?;
-        w.write(b"^ca()^ca()\n")?;
+        w.write_all(b"^ca()^ca()\n")?;
         Ok(())
     }
 }
