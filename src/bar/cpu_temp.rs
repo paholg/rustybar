@@ -1,6 +1,7 @@
 use crate::bar::{Bar, WriteBar, Writer};
 use crate::colormap::{ColorMap, ColorMapConfig};
 use failure;
+use lazy_static::lazy_static;
 use regex;
 use std::process;
 use std::string::String;

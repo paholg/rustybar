@@ -1,148 +1,134 @@
-mod battery;
-mod brightness;
-mod clock;
-mod cpu;
-mod cpu_temp;
-mod memory;
-mod rainbow;
-mod stdin;
-
-pub use self::{
-    battery::{Battery, BatteryConfig},
-    brightness::{Brightness, BrightnessConfig},
-    clock::{Clock, ClockConfig},
-    cpu::{Cpu, CpuConfig},
-    cpu_temp::{CpuTemp, CpuTempConfig},
-    memory::{Memory, MemoryConfig},
-    rainbow::{Rainbow, RainbowConfig},
-    stdin::{Stdin, StdinConfig},
+use async_trait::async_trait;
+use tokio::{
+    io::{self, AsyncWriteExt},
+    process,
 };
 
-use failure;
-use std::{fmt, io, io::Write, marker, process, time::Duration};
+mod clock;
 
-use crate::color::Color;
+pub use clock::Clock;
 
-pub type Writer = process::ChildStdin;
-
-static SEPARATOR_COLOR: &'static str = "#888888";
-
-pub trait Bar: fmt::Debug + marker::Send + marker::Sync {
-    /// Give the length in pixels of the output string. This is used to size the dzen2 bar and to
-    /// allocate space. It is assumed to be constant.
-    fn len(&self) -> u32;
-
-    /// Block the thread until it is time to produce the next output. Default implemention sleeps
-    /// for 1 second.
-    fn block(&mut self) -> Result<(), failure::Error> {
-        ::std::thread::sleep(Duration::from_secs(1));
-        Ok(())
-    }
-
-    /// Any extra initialization steps can go here.
-    fn initialize(&mut self) -> Result<(), failure::Error> {
-        Ok(())
-    }
-
-    /// Output the bar contents to the writer.
-    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error>;
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum UpdateOn {
+    Tick,
+    Custom,
 }
+
+#[async_trait]
+pub trait Bar: std::fmt::Debug {
+    /// The width of the bar in pixels.
+    fn width(&self) -> u32;
+
+    /// Render the bar as a string.
+    async fn render(&self) -> String;
+
+    fn box_clone(&self) -> DynBar;
+
+    fn update_on(&self) -> UpdateOn {
+        UpdateOn::Tick
+    }
+}
+
+pub(crate) async fn render_bars(bars: impl Iterator<Item = &RunningBar>) -> Vec<String> {
+    let mut res = Vec::new();
+    for rb in bars {
+        let mut string = rb.bar.render().await;
+        string.push('\n');
+        res.push(string);
+    }
+
+    res
+}
+
+pub(crate) async fn update_bars(
+    bars: impl Iterator<Item = &mut RunningBar>,
+    strings: impl Iterator<Item = &String>,
+) -> io::Result<()> {
+    for (rb, string) in bars.zip(strings) {
+        rb.write(string.as_bytes()).await?;
+    }
+
+    Ok(())
+}
+
+pub type DynBar = Box<dyn Bar + Send + Sync>;
 
 #[derive(Debug)]
-pub struct BarWithSep {
-    bar: Box<dyn Bar>,
-    pub left: u32,
-    pub right: u32,
+pub(crate) struct RunningBar {
+    pub bar: DynBar,
+    child: process::Child,
 }
 
-impl BarWithSep {
-    pub fn new(bar: Box<dyn Bar>) -> BarWithSep {
-        BarWithSep {
-            left: 0,
+impl RunningBar {
+    pub fn start(bar: DynBar, font: &str, x: u32, w: u32, h: u32) -> RunningBar {
+        let process = process::Command::new("dzen2")
+            .args(&[
+                "-dock",
+                "-fn",
+                font,
+                "-x",
+                &x.to_string(),
+                "-w",
+                &w.to_string(),
+                "-h",
+                &h.to_string(),
+                "-bg",
+                "#000000",
+                "-ta",
+                "l",
+                "-e",
+                "onstart=raise",
+                "-xs",
+                "0",
+            ])
+            .kill_on_drop(true)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+
+        RunningBar {
             bar,
-            right: 0,
+            child: process,
         }
     }
+
+    pub async fn write<'a>(&mut self, bytes: &[u8]) -> io::Result<()> {
+        self.child.stdin.as_mut().unwrap().write_all(bytes).await
+    }
 }
 
-impl Bar for BarWithSep {
-    fn len(&self) -> u32 {
-        self.left + self.bar.len() + self.right
-    }
+pub struct RustyBar {
+    screen_id: u32,
+    left: Vec<DynBar>,
+    center: Vec<DynBar>,
+    right: Vec<DynBar>,
+}
 
-    fn block(&mut self) -> Result<(), failure::Error> {
-        self.bar.block()
-    }
-
-    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
-        if self.left > 0 {
-            write!(w, "^r({}x0)", self.left)?;
+impl RustyBar {
+    pub fn new(
+        screen_id: u32,
+        left: Vec<DynBar>,
+        center: Vec<DynBar>,
+        right: Vec<DynBar>,
+    ) -> RustyBar {
+        RustyBar {
+            screen_id,
+            left,
+            center,
+            right,
         }
+    }
 
-        self.bar.write(w)?;
-
-        if self.right > 0 {
-            write!(w, "^r({}x0)", self.right)?;
+    pub async fn run(&self) {
+        for rb in (self.left.iter())
+            .chain(self.center.iter())
+            .chain(self.right.iter())
+            .map(|bar| RunningBar::start(bar.box_clone(), "Monospace-9", 200, 300, 18))
+        {
+            match rb.bar.update_on() {
+                UpdateOn::Tick => crate::state::write().await.register_bar(rb),
+                UpdateOn::Custom => (), // Do nothing here; it's up to the user to handle
+            }
         }
-        w.write_all(b"\n")?;
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "bar")]
-#[allow(non_camel_case_types)]
-pub enum BarConfig {
-    battery(BatteryConfig),
-    brightness(BrightnessConfig),
-    clock(ClockConfig),
-    cpu(CpuConfig),
-    cputemp(CpuTempConfig),
-    memory(MemoryConfig),
-    rainbow(RainbowConfig),
-    stdin(StdinConfig),
-}
-
-impl BarConfig {
-    pub fn to_bar(&self, char_width: u32) -> Result<Box<dyn Bar>, failure::Error> {
-        let bar: Box<dyn Bar> = match self {
-            BarConfig::battery(ref b) => Box::new(Battery::from_config(&b, char_width)?),
-            BarConfig::brightness(ref b) => Box::new(Brightness::from_config(&b, char_width)?),
-            BarConfig::clock(ref b) => Box::new(Clock::from_config(&b, char_width)?),
-            BarConfig::cpu(ref b) => Box::new(Cpu::from_config(&b, char_width)?),
-            BarConfig::cputemp(ref b) => Box::new(CpuTemp::from_config(&b, char_width)?),
-            BarConfig::memory(ref b) => Box::new(Memory::from_config(&b, char_width)?),
-            BarConfig::rainbow(ref b) => Box::new(Rainbow::from_config(&b, char_width)?),
-            BarConfig::stdin(ref b) => Box::new(Stdin::from_config(&b, char_width)?),
-        };
-
-        Ok(bar)
-    }
-}
-
-pub trait WriteBar {
-    fn bar(&mut self, val: f32, color: Color, width: u32, height: u32) -> Result<(), io::Error>;
-    fn space(&mut self, width: u32) -> Result<(), io::Error>;
-    fn sep(&mut self, height: u32) -> Result<(), io::Error>;
-}
-
-impl<W: Write> WriteBar for W {
-    fn bar(&mut self, val: f32, color: Color, width: u32, height: u32) -> Result<(), io::Error> {
-        let wfill = (val * (width as f32) + 0.5) as u32;
-        let wempty = width - wfill;
-        write!(
-            self,
-            "^fg({})^r({2}x{1})^ro({3}x{1})",
-            color, height, wfill, wempty
-        )
-    }
-
-    fn space(&mut self, width: u32) -> Result<(), io::Error> {
-        write!(self, "^r({}x0)", width)
-    }
-
-    fn sep(&mut self, height: u32) -> Result<(), io::Error> {
-        write!(self, "^fg({})^r(2x{})", SEPARATOR_COLOR, height)
     }
 }

@@ -1,16 +1,4 @@
-use failure;
-
 use crate::color::Color;
-
-#[derive(Debug, Deserialize)]
-pub struct ColorMapConfig(Vec<[u8; 4]>);
-
-impl std::default::Default for ColorMapConfig {
-    /// A default ColorMap that goes from red to yellow to green.
-    fn default() -> Self {
-        ColorMapConfig(vec![[0, 255, 0, 0], [50, 255, 255, 0], [100, 0, 255, 0]])
-    }
-}
 
 /// A map that stores (value, color) pairs, which can be used to interpolate between
 /// colors for arbitrary values. Values are in the range [0,100].
@@ -39,14 +27,6 @@ impl<'a> std::iter::FromIterator<&'a [u8; 4]> for ColorMap {
 }
 
 impl ColorMap {
-    pub fn from_config(config: &ColorMapConfig) -> Result<ColorMap, failure::Error> {
-        if let Some(v) = config.0.iter().find(|v| v[0] > 100) {
-            bail!("Invalid colormap. Value {} must be in range [0, 100]", v[0]);
-        }
-
-        Ok(config.0.iter().collect())
-    }
-
     /// This does the interpolation, and gives you the color corresponding to the value
     /// called with, as dicated by the color map.
     /// Clamps val to a maximum of 100.

@@ -1,18 +1,7 @@
-use std::io::Write;
-
-use crate::bar::{Bar, Writer};
-
-use chrono;
-use failure;
-
-#[derive(Debug, Deserialize)]
-pub struct ClockConfig {
-    pub color: String,
-    pub format: String,
-}
+use async_trait::async_trait;
 
 /// A statusbar for testing colormaps.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Clock {
     color: String,
     format: String,
@@ -21,31 +10,33 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn from_config(config: &ClockConfig, char_width: u32) -> Result<Clock, failure::Error> {
-        let mut clock = Clock {
-            color: config.color.clone(),
-            format: config.format.clone(),
-            char_width,
-            length: 0,
-        };
-
-        let now = chrono::Local::now();
-        let text = now.format(&config.format);
-        let string = format!("{}", text);
-        clock.length = char_width * string.trim().len() as u32;
-        Ok(clock)
+    pub fn new(
+        color: impl Into<String>,
+        format: impl Into<String>,
+        char_width: u32,
+        length: u32,
+    ) -> Clock {
+        Clock {
+            color: color.into(),
+            format: format.into(),
+            char_width: char_width,
+            length: length,
+        }
     }
 }
 
-impl Bar for Clock {
-    fn len(&self) -> u32 {
+#[async_trait]
+impl crate::bar::Bar for Clock {
+    fn width(&self) -> u32 {
         self.length
     }
 
-    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
-        let now = chrono::Local::now();
-        let text = now.format(&self.format);
-        write!(w, "^fg({}){}", self.color, text)?;
-        Ok(())
+    async fn render(&self) -> String {
+        let text = crate::state::read().await.time().format(&self.format);
+        format!("^fg({}){}", self.color, text)
+    }
+
+    fn box_clone(&self) -> crate::bar::DynBar {
+        Box::new(self.clone())
     }
 }

@@ -2,7 +2,7 @@ use std::fmt;
 use std::num::ParseIntError;
 
 /// An RGB triplet
-#[derive(Copy, Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug)]
 pub struct Color {
     pub r: u8,
     pub g: u8,

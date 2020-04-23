@@ -1,210 +1,243 @@
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate slog_scope;
-#[macro_use(slog_o, slog_debug, slog_info, slog_warn, slog_error)]
-extern crate slog;
-
-use directories;
-use regex;
-use slog::Drain;
-use std::{
-    fs,
-    io::{Read, Write},
-    process,
-    sync::{atomic, Arc},
-    thread,
-};
+use rustybar::*;
+use std::time::Duration;
 use structopt::StructOpt;
-use toml;
+use tokio::{self, io::AsyncWriteExt};
 
-// use structopt::StructOpt;
+/// A convenience macro for creating a static Regex, for repeated use at only one call-site.  Copied
+/// from https://github.com/Canop/lazy-regex
+#[macro_export]
+macro_rules! regex {
+    ($s: literal) => {{
+        lazy_static! {
+            static ref RE: regex::Regex = regex::Regex::new($s).unwrap();
+        }
+        &*RE
+    }};
+}
 
-mod bar;
-mod color;
-mod colormap;
-mod config;
+struct Font<'a> {
+    pub name: &'a str,
+    pub width: u32,
+}
 
-use crate::bar::Bar;
+impl<'a> Font<'a> {
+    fn new(name: &str, width: u32) -> Font {
+        Font { name, width }
+    }
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rustybar", about = "A simple statusbar program.")]
 struct Opt {}
 
-fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
-    // -- Populate default config ----------------------------------------------
+#[tokio::main]
+async fn main() {
+    tokio::spawn(state::tick());
+    let font = Font::new("Monospace-9", 10);
 
-    if !config_path.is_file() {
-        info!(
-            "You do not have an existing config file. Creating and populating '{}'",
-            config_path.display()
-        );
-        let mut file = fs::File::create(&config_path)?;
-        let example_config = include_bytes!("../example_config.toml");
-        file.write_all(example_config)?;
-    }
+    // ----------------------------------------------------------------------------------------------
 
-    // -- load config file -----------------------------------------------------
-    ensure!(config_path.is_file(), "config path bad!!");
-    let toml_string = {
-        let mut toml_string = String::new();
-        fs::File::open(&config_path)?.read_to_string(&mut toml_string)?;
-        toml_string
-    };
+    let bar = rustybar::bar::Clock::new("#aaaaaa", "%H:%M:%S", 10, 8);
+    let rb = rustybar::bar::RustyBar::new(0, vec![Box::new(bar)], vec![], vec![]);
+    rb.run().await;
 
-    let config: config::Config = toml::from_str(&toml_string)?;
-    // debug!("Config: {:#?}", config);
+    tokio::time::delay_for(Duration::from_secs(100000)).await;
 
-    let font = &config.font;
-    let height = config.height;
-    let bg = &config.background;
+    // ----------------------------------------------------------------------------------------------
 
-    let mut screens = Vec::new();
-    let mut threads: Vec<thread::JoinHandle<_>> = Vec::new();
-    let reset = Arc::new(atomic::AtomicBool::new(true));
+    // let mut process = tokio::process::Command::new("dzen2")
+    //     .args(&[
+    //         "-dock",
+    //         "-fn",
+    //         font.name,
+    //         "-x",
+    //         "1200",
+    //         "-w",
+    //         "200",
+    //         "-h",
+    //         "18",
+    //         "-bg",
+    //         "#222222",
+    //         "-ta",
+    //         "l",
+    //         "-e",
+    //         "onstart=raise",
+    //         "-xs",
+    //         "0",
+    //     ])
+    //     .kill_on_drop(true)
+    //     .stdin(std::process::Stdio::piped())
+    //     .spawn()
+    //     .unwrap();
+    // // let mut child_stdin = process.stdin.unwrap();
 
-    loop {
-        let new_screens = get_screens()?;
-        if new_screens == screens {
-            thread::sleep(std::time::Duration::from_secs(1));
-            continue;
-        }
-        std::mem::replace(&mut screens, new_screens);
+    // let clock = rustybar::bar::Clock::new("#223344", "%H:%M:%S", 10, 80);
 
-        reset.store(true, atomic::Ordering::Relaxed);
+    // let cmap: colormap::ColorMap = [[0, 0, 255, 0], [50, 255, 255, 0], [100, 255, 0, 0]]
+    //     .iter()
+    //     .collect();
+    // loop {
+    //     let state = state::read().await;
 
-        for thread in threads {
-            thread.join().unwrap()?;
-        }
-        threads = Vec::new();
+    //     let map_val = (state.bytes_recieved() as f32 / 10e6 * 100.0) as u8;
+    //     //dbg!(state.bytes_recieved() as f32, 100e9);
+    //     let mut mem = format!(
+    //         "^fg({}){}",
+    //         cmap.map(map_val),
+    //         bytes::format_bytes(state.bytes_recieved())
+    //     );
 
-        reset.store(false, atomic::Ordering::Relaxed);
+    //     mem.push_str("\n");
+    //     process
+    //         .stdin
+    //         .as_mut()
+    //         .unwrap()
+    //         .write_all(mem.as_bytes())
+    //         .await
+    //         .unwrap();
 
-        let bars = config::generate_bars(&config, screens[0].width)?;
+    //     print!("| ");
+    //     state.cpus().for_each(|cpu| print!("{:.2} ", cpu / 100.0));
 
-        let mut left = config.left_gap;
-        for mut bar in bars {
-            let len = bar.len();
-            let reset = reset.clone();
-            {
-                let font = font.clone();
-                let left = left;
-                let bg = bg.clone();
-                let handler = thread::spawn(move || -> Result<(), failure::Error> {
-                    let process = process::Command::new("dzen2")
-                        .args(&[
-                            "-dock",
-                            "-fn",
-                            &font,
-                            "-x",
-                            &left.to_string(),
-                            "-w",
-                            &(bar.len()).to_string(),
-                            "-h",
-                            &height.to_string(),
-                            "-bg",
-                            &bg,
-                            "-ta",
-                            "l",
-                            "-e",
-                            "onstart=lower",
-                            "-xs",
-                            "0",
-                        ])
-                        .stdin(process::Stdio::piped())
-                        .spawn()
-                        .unwrap();
-                    let mut child_stdin = &mut process.stdin.unwrap();
-                    bar.initialize()?;
-                    loop {
-                        if let Err(e) = bar.write(&mut child_stdin).and_then(|_| bar.block()) {
-                            error!("{}", e);
-                        }
-                        if reset.load(atomic::Ordering::Relaxed) {
-                            break;
-                        }
-                    }
-                    Ok(())
-                });
+    //     let temp = state.temperature();
+    //     print!("| {}° ", temp);
 
-                threads.push(handler);
-            }
-            left += len;
-        }
-    }
+    //     print!("| {} ", bytes::format_bytes(state.free_memory()));
+    //     print!("| {} ", bytes::format_bytes(state.bytes_recieved()));
+
+    //     println!("|");
+
+    //     std::mem::drop(state);
+    //     tokio::time::delay_for(Duration::from_secs(1)).await;
+    // }
 }
 
-fn main() {
-    let project_dirs = directories::ProjectDirs::from("", "", "rustybar");
-    let config_dir = project_dirs.config_dir();
-    let config_path = config_dir.join("config.toml");
-    let log_path = config_dir.join("log");
+// fn run(config_path: &std::path::Path) -> Result<(), failure::Error> {
+//     // -- Populate default config ----------------------------------------------
 
-    // -- setup logging --------------------------------------------------------
+//     if !config_path.is_file() {
+//         info!(
+//             "You do not have an existing config file. Creating and populating '{}'",
+//             config_path.display()
+//         );
+//         let mut file = fs::File::create(&config_path)?;
+//         let example_config = include_bytes!("../example_config.toml");
+//         file.write_all(example_config)?;
+//     }
 
-    {
-        // _guard needs to be in a smaller scope so that it is dropped before `exit`
-        let _guard = {
-            let log_file = fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(log_path)
-                .unwrap();
-            let drain_file = {
-                let decorator = slog_term::PlainDecorator::new(log_file);
-                let drain = slog_term::FullFormat::new(decorator).build().fuse();
-                slog_async::Async::new(drain).build().fuse()
-            };
+//     // -- load config file -----------------------------------------------------
+//     ensure!(config_path.is_file(), "config path bad!!");
+//     let toml_string = {
+//         let mut toml_string = String::new();
+//         fs::File::open(&config_path)?.read_to_string(&mut toml_string)?;
+//         toml_string
+//     };
 
-            let drain_stdout = {
-                let decorator = slog_term::TermDecorator::new().build();
-                let drain = slog_term::FullFormat::new(decorator).build().fuse();
-                slog_async::Async::new(drain).build().fuse()
-            };
+//     let config: config::Config = toml::from_str(&toml_string)?;
+//     // debug!("Config: {:#?}", config);
 
-            let drain = slog::Duplicate::new(drain_file, drain_stdout).fuse();
-            let log = slog::Logger::root(drain, slog_o!());
+//     let font = &config.font;
+//     let height = config.height;
+//     let bg = &config.background;
 
-            slog_scope::set_global_logger(log)
-        };
+//     let mut screens = Vec::new();
+//     let mut threads: Vec<thread::JoinHandle<_>> = Vec::new();
+//     let reset = Arc::new(atomic::AtomicBool::new(true));
 
-        // Run!
-        if let Err(e) = run(&config_path) {
-            error!("Error: {}\nBacktrace: {}", e, e.backtrace());
-        }
-    }
-    std::process::exit(1);
-}
+//     loop {
+//         let new_screens = get_screens()?;
+//         if new_screens == screens {
+//             thread::sleep(Duration::from_secs(1));
+//             continue;
+//         }
+//         std::mem::replace(&mut screens, new_screens);
 
-#[derive(Debug, Eq, PartialEq)]
-struct Screen {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-}
+//         reset.store(true, atomic::Ordering::Relaxed);
 
-fn get_screens() -> Result<Vec<Screen>, failure::Error> {
-    lazy_static! {
-        static ref RE: regex::Regex = regex::Regex::new(r"\d:.* (\d+).*+(\d+)+(\d+)").unwrap();
-    }
+//         for thread in threads {
+//             thread.join().unwrap()?;
+//         }
+//         threads = Vec::new();
 
-    let output = std::process::Command::new("xrandr")
-        .arg("--listactivemonitors")
-        .output()?
-        .stdout;
-    let out = String::from_utf8(output)?;
-    RE.captures_iter(&out)
-        .map(|cap| {
-            Ok(Screen {
-                width: cap[1].parse::<u32>()?,
-                x: cap[2].parse()?,
-                y: cap[3].parse()?,
-            })
-        })
-        .collect()
-}
+//         reset.store(false, atomic::Ordering::Relaxed);
+
+//         let bars = config::generate_bars(&config, screens[0].width)?;
+
+//         let mut left = config.left_gap;
+//         for mut bar in bars {
+//             let len = bar.len();
+//             let reset = reset.clone();
+//             {
+//                 let font = font.clone();
+//                 let left = left;
+//                 let bg = bg.clone();
+//                 let handler = thread::spawn(move || -> Result<(), failure::Error> {
+//                     let process = process::Command::new("dzen2")
+//                         .args(&[
+//                             "-dock",
+//                             "-fn",
+//                             &font,
+//                             "-x",
+//                             &left.to_string(),
+//                             "-w",
+//                             &(bar.len()).to_string(),
+//                             "-h",
+//                             &height.to_string(),
+//                             "-bg",
+//                             &bg,
+//                             "-ta",
+//                             "l",
+//                             "-e",
+//                             "onstart=lower",
+//                             "-xs",
+//                             "0",
+//                         ])
+//                         .stdin(process::Stdio::piped())
+//                         .spawn()
+//                         .unwrap();
+//                     let mut child_stdin = &mut process.stdin.unwrap();
+//                     bar.initialize()?;
+//                     loop {
+//                         if let Err(e) = bar.write(&mut child_stdin).and_then(|_| bar.block()) {
+//                             error!("{}", e);
+//                         }
+//                         if reset.load(atomic::Ordering::Relaxed) {
+//                             break;
+//                         }
+//                     }
+//                     Ok(())
+//                 });
+
+//                 threads.push(handler);
+//             }
+//             left += len;
+//         }
+//     }
+// }
+
+// #[derive(Debug, Eq, PartialEq)]
+// struct Screen {
+//     pub x: u32,
+//     pub y: u32,
+//     pub width: u32,
+// }
+
+// fn get_screens() -> Result<Vec<Screen>, failure::Error> {
+//     let output = std::process::Command::new("xrandr")
+//         .arg("--listactivemonitors")
+//         .output()?
+//         .stdout;
+//     let out = String::from_utf8(output)?;
+
+//     regex!(r"\d:.* (\d+).*+(\d+)+(\d+)")
+//         .captures_iter(&out)
+//         .map(|cap| {
+//             Ok(Screen {
+//                 width: cap[1].parse::<u32>()?,
+//                 x: cap[2].parse()?,
+//                 y: cap[3].parse()?,
+//             })
+//         })
+//         .collect()
+// }
+// ;
