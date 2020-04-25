@@ -8,20 +8,23 @@ use crate::color::Color;
 #[derive(Clone, Debug)]
 pub struct ColorMap {
     colors: Vec<Color>,
-    values: Vec<u8>,
+    values: Vec<f32>,
 }
 
-impl<'a> std::iter::FromIterator<&'a [u8; 4]> for ColorMap {
-    /// Convert an iterator of 4 element arrays to a ColorMap. The first element in each array is
-    /// treated as the value, and the last 3 as an RGB triplet.
-    fn from_iter<I: IntoIterator<Item = &'a [u8; 4]>>(iter: I) -> Self {
+impl<'a> std::iter::FromIterator<&'a (f32, Color)> for ColorMap {
+    fn from_iter<I: IntoIterator<Item = &'a (f32, Color)>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let mut values = vec![];
         let mut colors = vec![];
-        for &[v, r, g, b] in iter {
+        for &(v, c) in iter {
             values.push(v);
-            colors.push(Color::new(r, g, b));
+            colors.push(c);
         }
+        assert!(
+            values.len() > 1,
+            "Must have at least two elements for a color_map"
+        );
+
         ColorMap { values, colors }
     }
 }
@@ -29,18 +32,19 @@ impl<'a> std::iter::FromIterator<&'a [u8; 4]> for ColorMap {
 impl ColorMap {
     /// This does the interpolation, and gives you the color corresponding to the value
     /// called with, as dicated by the color map.
-    /// Clamps val to a maximum of 100.
-    pub fn map(&self, val: u8) -> Color {
-        let val = std::cmp::min(val, 100);
+    pub fn map(&self, val: f32) -> Color {
+        if val < self.values[0] {
+            return self.colors[0];
+        } else if val > self.values[self.values.len() - 1] {
+            return self.colors[self.colors.len() - 1];
+        }
 
         let mut i = 1;
-        while self.values[i] < val {
+        while self.values[i] < val && i < self.values.len() - 1 {
             i += 1;
         }
-        let lower: f32 =
-            f32::from(self.values[i] - val) / f32::from(self.values[i] - self.values[i - 1]);
-        let upper: f32 =
-            f32::from(val - self.values[i - 1]) / f32::from(self.values[i] - self.values[i - 1]);
+        let lower: f32 = (self.values[i] - val) / (self.values[i] - self.values[i - 1]);
+        let upper: f32 = (val - self.values[i - 1]) / (self.values[i] - self.values[i - 1]);
 
         let interpolate = |c1, c2| (lower * (f32::from(c1)) + upper * f32::from(c2)) as u8;
         let red: u8 = interpolate(self.colors[i - 1].r, self.colors[i].r);

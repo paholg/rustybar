@@ -2,10 +2,10 @@ use lazy_static::lazy_static;
 use std::time::Duration;
 use sysinfo::{ComponentExt, NetworkExt, NetworksExt, ProcessorExt, SystemExt};
 use tokio::io;
-use tokio::stream::StreamExt;
 use tokio::sync::{self, RwLock};
 
 use crate::bar::RunningBar;
+use crate::screen::Screen;
 
 lazy_static! {
     static ref STATE: RwLock<State> = RwLock::new(State::new());
@@ -37,6 +37,7 @@ pub struct State {
     /// Maximum temperature of all cpus.
     temperature: f32,
 
+    pub screens: Vec<Screen>,
     bars_to_update: Vec<RunningBar>,
 }
 
@@ -60,6 +61,7 @@ impl State {
             bytes_transmitted: 0,
             temperature: -1.0,
             bars_to_update: Vec::new(),
+            screens: crate::screen::get_screens(),
         }
     }
 
@@ -69,6 +71,7 @@ impl State {
         self.tick_duration = now.duration_since(self.last_tick);
         self.last_tick = now;
         self.time = chrono::Local::now();
+        dbg!(&self.time);
         self.system.refresh_all();
 
         let (rec, tran) = self
@@ -117,7 +120,7 @@ impl State {
         self.system
             .get_processors()
             .iter()
-            .map(|p| p.get_cpu_usage())
+            .map(|p| p.get_cpu_usage() / 100.0)
     }
 
     /// Free memory in bytes
@@ -137,6 +140,11 @@ pub async fn tick() -> io::Result<()> {
         write().await.on_tick();
 
         let state = read().await;
+
+        let new_screens = crate::screen::get_screens();
+        if state.screens != new_screens {
+            todo!("recreate bars");
+        }
 
         let strings = crate::bar::render_bars(state.bars_to_update.iter()).await;
 

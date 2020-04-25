@@ -1,16 +1,17 @@
 use async_trait::async_trait;
 
+/// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
 #[derive(Clone, Debug)]
-pub struct Memory {
+pub struct Temp {
     colormap: crate::ColorMap,
-    width: u32,
+    pub width: u32,
 }
 
-impl Memory {
-    pub async fn new(colormap: crate::ColorMap, padding: u32) -> Box<Memory> {
+impl Temp {
+    pub async fn new(colormap: crate::ColorMap, padding: u32) -> Box<Temp> {
         let char_width = crate::config::read().await.font.width;
 
-        Box::new(Memory {
+        Box::new(Temp {
             colormap,
             width: char_width * 6 + padding,
         })
@@ -18,19 +19,15 @@ impl Memory {
 }
 
 #[async_trait]
-impl crate::bar::Bar for Memory {
+impl crate::bar::Bar for Temp {
     fn width(&self) -> u32 {
         self.width
     }
 
     async fn render(&self) -> String {
-        let memory = crate::state::read().await.free_memory();
+        let temp = crate::state::read().await.temperature();
 
-        format!(
-            "^fg({}){}",
-            self.colormap.map(memory as f32),
-            crate::format_bytes(memory)
-        )
+        format!("^fg({}){:3.0} °C", self.colormap.map(temp), temp)
     }
 
     fn box_clone(&self) -> crate::bar::DynBar {

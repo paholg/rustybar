@@ -5,12 +5,21 @@ use tokio::{
 };
 
 mod clock;
+mod cpu;
+mod memory;
+pub(crate) mod stdin;
+mod temp;
 
 pub use clock::Clock;
+pub use cpu::Cpu;
+pub use memory::Memory;
+pub use stdin::{run, Stdin};
+pub use temp::Temp;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UpdateOn {
     Tick,
+    Stdin,
     Custom,
 }
 
@@ -60,7 +69,7 @@ pub(crate) struct RunningBar {
 }
 
 impl RunningBar {
-    pub fn start(bar: DynBar, font: &str, x: u32, w: u32, h: u32) -> RunningBar {
+    pub fn start(bar: DynBar, font: &str, x: u32, y: u32, w: u32, h: u32, bg: &str) -> RunningBar {
         let process = process::Command::new("dzen2")
             .args(&[
                 "-dock",
@@ -68,12 +77,14 @@ impl RunningBar {
                 font,
                 "-x",
                 &x.to_string(),
+                "-y",
+                &y.to_string(),
                 "-w",
                 &w.to_string(),
                 "-h",
                 &h.to_string(),
                 "-bg",
-                "#000000",
+                bg,
                 "-ta",
                 "l",
                 "-e",
@@ -97,38 +108,20 @@ impl RunningBar {
     }
 }
 
-pub struct RustyBar {
-    screen_id: u32,
-    left: Vec<DynBar>,
-    center: Vec<DynBar>,
-    right: Vec<DynBar>,
+pub fn bar(val: f32, color: crate::color::Color, width: u32, height: u32) -> String {
+    let wfill = (val * (width as f32) + 0.5) as u32;
+    let wempty = width - wfill;
+    format!(
+        "^fg({})^r({2}x{1})^ro({3}x{1})",
+        color, height, wfill, wempty
+    )
 }
 
-impl RustyBar {
-    pub fn new(
-        screen_id: u32,
-        left: Vec<DynBar>,
-        center: Vec<DynBar>,
-        right: Vec<DynBar>,
-    ) -> RustyBar {
-        RustyBar {
-            screen_id,
-            left,
-            center,
-            right,
-        }
-    }
-
-    pub async fn run(&self) {
-        for rb in (self.left.iter())
-            .chain(self.center.iter())
-            .chain(self.right.iter())
-            .map(|bar| RunningBar::start(bar.box_clone(), "Monospace-9", 200, 300, 18))
-        {
-            match rb.bar.update_on() {
-                UpdateOn::Tick => crate::state::write().await.register_bar(rb),
-                UpdateOn::Custom => (), // Do nothing here; it's up to the user to handle
-            }
-        }
-    }
+pub fn space(width: u32) -> String {
+    format!("^r({}x0)", width)
 }
+
+// TODO
+// pub fn sep(height: u32) -> String {
+//     format!("^fg({})^r(2x{})", TEXTCOLOR, height)
+// }

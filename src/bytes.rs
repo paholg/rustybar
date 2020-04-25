@@ -10,12 +10,12 @@ impl<'a> Unit<'a> {
 }
 
 const BYTE_UNITS: [Unit; 6] = [
-    Unit::new(1e3, "kB"),
-    Unit::new(1e6, "MB"),
-    Unit::new(1e9, "GB"),
-    Unit::new(1e12, "TB"),
-    Unit::new(1e15, "PB"),
-    Unit::new(1e18, "EB"),
+    Unit::new(1e3, "k"),
+    Unit::new(1e6, "M"),
+    Unit::new(1e9, "G"),
+    Unit::new(1e12, "T"),
+    Unit::new(1e15, "P"),
+    Unit::new(1e18, "E"),
 ];
 
 pub fn format_bytes(bytes: u64) -> String {

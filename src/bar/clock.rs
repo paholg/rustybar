@@ -6,29 +6,31 @@ pub struct Clock {
     color: String,
     format: String,
     char_width: u32,
-    length: u32,
+    width: u32,
 }
 
 impl Clock {
-    pub fn new(
+    pub async fn new(
         color: impl Into<String>,
         format: impl Into<String>,
-        char_width: u32,
-        length: u32,
-    ) -> Clock {
-        Clock {
+        num_chars: u32,
+        padding: u32,
+    ) -> Box<Clock> {
+        let char_width = crate::config::read().await.font.width;
+
+        Box::new(Clock {
             color: color.into(),
             format: format.into(),
-            char_width: char_width,
-            length: length,
-        }
+            char_width,
+            width: char_width * num_chars + padding,
+        })
     }
 }
 
 #[async_trait]
 impl crate::bar::Bar for Clock {
     fn width(&self) -> u32 {
-        self.length
+        self.width
     }
 
     async fn render(&self) -> String {

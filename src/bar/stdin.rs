@@ -1,51 +1,77 @@
-use failure;
-use std::{io, io::Write};
-
-use crate::bar::{Bar, Writer};
-
-#[derive(Debug, Deserialize)]
-pub struct StdinConfig {
-    length: u32,
-}
+use async_trait::async_trait;
 
 /// A statusbar for stdin.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Stdin {
-    length: u32,
-    char_width: u32,
-    buffer: String,
+    width: u32,
 }
 
 impl Stdin {
-    pub fn from_config(config: &StdinConfig, char_width: u32) -> Result<Stdin, failure::Error> {
-        Ok(Stdin {
-            length: config.length,
-            char_width,
-            buffer: String::new(),
-        })
+    pub async fn new(padding: u32) -> Box<Stdin> {
+        Box::new(Stdin { width: padding })
     }
 }
 
-impl Bar for Stdin {
-    fn len(&self) -> u32 {
-        self.length * self.char_width
+#[async_trait]
+impl crate::bar::Bar for Stdin {
+    fn width(&self) -> u32 {
+        self.width
     }
 
-    // This bar is a bit unusual, and the blocking happens in the `write` function.
-    fn block(&mut self) -> Result<(), failure::Error> {
-        Ok(())
+    async fn render(&self) -> String {
+        String::new()
     }
 
-    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
-        self.buffer.clear();
-        io::stdin().read_line(&mut self.buffer)?;
+    fn box_clone(&self) -> crate::bar::DynBar {
+        Box::new(self.clone())
+    }
 
-        w.write_all(b"^tw()")?;
-        // Skip the final new line as that is provided by `BarWithSep`
-        if self.buffer.len() > 1 {
-            w.write_all(self.buffer[0..self.buffer.len() - 1].as_bytes())?;
+    fn update_on(&self) -> crate::bar::UpdateOn {
+        crate::bar::UpdateOn::Stdin
+    }
+}
+
+pub(crate) mod state {
+    use tokio::io::AsyncBufReadExt;
+    use tokio::stream::StreamExt;
+    use tokio::{io, sync};
+
+    pub(crate) struct State {
+        bars_to_update: Vec<crate::bar::RunningBar>,
+    }
+
+    impl State {
+        fn new() -> State {
+            State {
+                bars_to_update: Vec::new(),
+            }
         }
 
-        Ok(())
+        // These should be part of a trait for state tracking (as well as update_bars):
+        pub(crate) fn register_bar(&mut self, bar: crate::bar::RunningBar) {
+            self.bars_to_update.push(bar);
+        }
+
+        pub(crate) fn clear_bars(&mut self) {
+            self.bars_to_update.clear();
+        }
+    }
+
+    lazy_static::lazy_static! {
+        pub(crate) static ref STDIN: sync::RwLock<State> = sync::RwLock::new(State::new());
+    }
+
+    pub async fn run() -> io::Result<()> {
+        let mut lines = io::BufReader::new(io::stdin()).lines();
+        while let Some(line) = lines.next().await {
+            let mut line = line.unwrap();
+            line.push('\n');
+            let mut state = STDIN.write().await;
+            let bars = state.bars_to_update.iter_mut();
+            crate::bar::update_bars(bars, std::iter::repeat(&line)).await?;
+        }
+
+        unreachable!()
     }
 }
+pub use state::run;

@@ -24,3 +24,4 @@
   tokio = { version = "*", features = ["full"] }
   toml = "0.4"
   bytefmt = "*"
+  itertools = "*"

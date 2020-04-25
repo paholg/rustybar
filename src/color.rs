@@ -1,5 +1,4 @@
 use std::fmt;
-use std::num::ParseIntError;
 
 /// An RGB triplet
 #[derive(Copy, Clone, Debug)]
@@ -20,31 +19,23 @@ impl Color {
     }
 }
 
-#[derive(Debug)]
-pub enum ParseError {
-    ParseIntError(ParseIntError),
-    Other(String),
-}
-
-impl std::str::FromStr for Color {
-    type Err = ParseError;
-
-    /// expects a color in the format "#ffffff"
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl std::convert::From<&str> for Color {
+    /// expects a color in the format "#ffffff", panics otherwise
+    fn from(s: &str) -> Self {
         if s.len() != 7 || s.bytes().next() != Some(b'#') {
-            return Err(ParseError::Other(s.into()));
+            panic!("Invalid string");
         }
 
-        let num = u32::from_str_radix(&s[1..7], 16).map_err(ParseError::ParseIntError)?;
+        let num = u32::from_str_radix(&s[1..7], 16).unwrap();
         let red = num >> 16;
         let green = (num >> 8) & 255;
         let blue = num & 255;
 
-        Ok(Color {
+        Color {
             r: red as u8,
             g: green as u8,
             b: blue as u8,
-        })
+        }
     }
 }
 
