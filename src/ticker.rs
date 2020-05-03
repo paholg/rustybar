@@ -142,15 +142,19 @@ impl Ticker {
             (ticker_lock.bar_config.clone(), ticker_lock.screens.clone())
         };
 
+        println!("stopping");
         for bar in &bars {
             bar.stop().await;
         }
+        println!("stopped");
 
+        println!("starting");
         for bar in &bars {
             if let Some(screen) = screens.iter().find(|&&screen| screen.id == bar.screen_id) {
                 bar.start(screen).await;
             }
         }
+        println!("started");
     }
 }
 

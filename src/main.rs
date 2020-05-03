@@ -36,8 +36,7 @@ async fn tokio_main() {
 
     let rb = rustybar::RustyBar::new(
         0,
-        // vec![bar::Stdin::new(100).await],
-        vec![],
+        vec![bar::Stdin::new(100).await],
         vec![
             bar::Temp::new(
                 [

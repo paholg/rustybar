@@ -7,7 +7,7 @@ use tokio::{
 mod clock;
 mod cpu;
 mod memory;
-// pub(crate) mod stdin;
+pub mod stdin;
 mod temp;
 
 use crate::ticker::Ticker;
@@ -15,7 +15,7 @@ use crate::updater::Updater;
 pub use clock::Clock;
 pub use cpu::Cpu;
 pub use memory::Memory;
-// pub use stdin::{run, Stdin};
+pub use stdin::Stdin;
 pub use temp::Temp;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

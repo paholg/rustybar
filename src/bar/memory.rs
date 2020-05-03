@@ -27,8 +27,6 @@ impl crate::bar::Bar for Memory {
     async fn render(&self) -> String {
         let memory = Ticker.free_memory().await;
 
-        println!("Rendering memory bar");
-
         format!(
             "^fg({}){}",
             self.colormap.map(memory as f32),
