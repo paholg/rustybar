@@ -1,3 +1,4 @@
+use crate::ticker::Ticker;
 use async_trait::async_trait;
 
 /// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
@@ -9,7 +10,7 @@ pub struct Temp {
 
 impl Temp {
     pub async fn new(colormap: crate::ColorMap, padding: u32) -> Box<Temp> {
-        let char_width = crate::config::read().await.font.width;
+        let char_width = crate::config::get().await.font.width;
 
         Box::new(Temp {
             colormap,
@@ -25,7 +26,7 @@ impl crate::bar::Bar for Temp {
     }
 
     async fn render(&self) -> String {
-        let temp = crate::state::read().await.temperature();
+        let temp = Ticker.temperature().await;
 
         format!("^fg({}){:3.0} °C", self.colormap.map(temp), temp)
     }

@@ -7,13 +7,15 @@ use tokio::{
 mod clock;
 mod cpu;
 mod memory;
-pub(crate) mod stdin;
+// pub(crate) mod stdin;
 mod temp;
 
+use crate::ticker::Ticker;
+use crate::updater::Updater;
 pub use clock::Clock;
 pub use cpu::Cpu;
 pub use memory::Memory;
-pub use stdin::{run, Stdin};
+// pub use stdin::{run, Stdin};
 pub use temp::Temp;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -33,37 +35,15 @@ pub trait Bar: std::fmt::Debug {
 
     fn box_clone(&self) -> DynBar;
 
-    fn update_on(&self) -> UpdateOn {
-        UpdateOn::Tick
+    fn updater(&self) -> Box<dyn Updater> {
+        Box::new(Ticker)
     }
-}
-
-pub(crate) async fn render_bars(bars: impl Iterator<Item = &RunningBar>) -> Vec<String> {
-    let mut res = Vec::new();
-    for rb in bars {
-        let mut string = rb.bar.render().await;
-        string.push('\n');
-        res.push(string);
-    }
-
-    res
-}
-
-pub(crate) async fn update_bars(
-    bars: impl Iterator<Item = &mut RunningBar>,
-    strings: impl Iterator<Item = &String>,
-) -> io::Result<()> {
-    for (rb, string) in bars.zip(strings) {
-        rb.write(string.as_bytes()).await?;
-    }
-
-    Ok(())
 }
 
 pub type DynBar = Box<dyn Bar + Send + Sync>;
 
 #[derive(Debug)]
-pub(crate) struct RunningBar {
+pub struct RunningBar {
     pub bar: DynBar,
     child: process::Child,
 }
@@ -106,22 +86,10 @@ impl RunningBar {
     pub async fn write<'a>(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.child.stdin.as_mut().unwrap().write_all(bytes).await
     }
-}
 
-pub fn bar(val: f32, color: crate::color::Color, width: u32, height: u32) -> String {
-    let wfill = (val * (width as f32) + 0.5) as u32;
-    let wempty = width - wfill;
-    format!(
-        "^fg({})^r({2}x{1})^ro({3}x{1})",
-        color, height, wfill, wempty
-    )
+    pub async fn register(self) {
+        let updater = self.bar.updater();
+        updater.register(self).await;
+        updater.run().await;
+    }
 }
-
-pub fn space(width: u32) -> String {
-    format!("^r({}x0)", width)
-}
-
-// TODO
-// pub fn sep(height: u32) -> String {
-//     format!("^fg({})^r(2x{})", TEXTCOLOR, height)
-// }

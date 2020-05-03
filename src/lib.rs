@@ -1,15 +1,18 @@
+use bar::DynBar;
+pub use bytes::format_bytes;
+pub use color::{Color, ColorMap};
+use screen::Screen;
+use ticker::Ticker;
+
 pub mod bar;
 mod bytes;
 mod color;
-mod colormap;
 pub mod config;
+pub mod draw;
 pub mod screen;
-pub mod state;
-
-use bar::DynBar;
-pub use bytes::format_bytes;
-pub use color::Color;
-pub use colormap::ColorMap;
+mod stdin;
+mod ticker;
+mod updater;
 
 /// A convenience macro for creating a static Regex, for repeated use at only one call-site.  Copied
 /// from https://github.com/Canop/lazy-regex
@@ -23,6 +26,7 @@ macro_rules! regex {
     }};
 }
 
+#[derive(Clone, Debug)]
 pub struct Font {
     pub name: &'static str,
     pub width: u32,
@@ -68,28 +72,33 @@ impl RustyBar {
         }
     }
 
-    pub async fn start(&self, screen: &screen::Screen) {
-        let mut state = state::write().await;
-        let mut stdin = bar::stdin::state::STDIN.write().await;
-        let config = config::read().await;
+    pub async fn stop(&self) {
+        for bar in self
+            .left
+            .iter()
+            .chain(self.center.iter())
+            .chain(self.right.iter())
+        {
+            bar.updater().clear().await;
+        }
+    }
 
-        let mut start_bar = |bar: &DynBar, x, pad| {
+    pub async fn start(&self, screen: &screen::Screen) {
+        async fn start_bar(bar: DynBar, x: u32, y: u32, pad: u32, config: &config::Config) {
+            let width = bar.width();
             let running_bar = bar::RunningBar::start(
-                bar.box_clone(),
+                bar,
                 config.font.name,
                 x,
-                screen.y,
-                bar.width() + pad,
+                y,
+                width + pad,
                 config.height,
                 config.background,
             );
-            match running_bar.bar.update_on() {
-                bar::UpdateOn::Tick => state.register_bar(running_bar),
-                bar::UpdateOn::Stdin => stdin.register_bar(running_bar),
-                bar::UpdateOn::Custom => (), // Do nothing here; it's up to the user to handle
-            }
-        };
+            running_bar.register().await;
+        }
 
+        let config = config::get().await;
         let mut x = screen.x;
 
         let center_width: u32 = self.center.iter().map(|b| b.width()).sum();
@@ -102,7 +111,7 @@ impl RustyBar {
             } else {
                 0
             };
-            start_bar(bar, x, pad);
+            start_bar(bar.box_clone(), x, screen.y, pad, &config).await;
             x += bar.width() + pad;
         }
 
@@ -112,22 +121,18 @@ impl RustyBar {
             } else {
                 0
             };
-            start_bar(bar, x, pad);
+            start_bar(bar.box_clone(), x, screen.y, pad, &config).await;
             x += bar.width() + pad;
         }
 
         for bar in &self.right {
-            start_bar(bar, x, 0);
+            start_bar(bar.box_clone(), x, screen.y, 0, &config).await;
             x += bar.width();
         }
     }
 }
 
-pub async fn start(bars: &[RustyBar]) {
-    let screens = state::read().await.screens.clone();
-    for bar in bars {
-        if let Some(screen) = screens.iter().find(|&&screen| screen.id == bar.screen_id) {
-            bar.start(screen).await;
-        }
-    }
+pub async fn start(bars: Vec<RustyBar>) {
+    Ticker.set_bar_config(bars).await;
+    Ticker.restart().await;
 }

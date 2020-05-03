@@ -1,3 +1,4 @@
+use crate::ticker::Ticker;
 use async_trait::async_trait;
 use itertools::Itertools;
 
@@ -19,7 +20,7 @@ impl Cpu {
         space: u32,
         padding: u32,
     ) -> Box<Cpu> {
-        let num_cores = crate::state::read().await.cpus().count() as u32;
+        let num_cores = Ticker.cpus().await.len() as u32;
 
         Box::new(Cpu {
             colormap,
@@ -38,13 +39,14 @@ impl crate::bar::Bar for Cpu {
     }
 
     async fn render(&self) -> String {
-        crate::state::read()
-            .await
+        Ticker
             .cpus()
+            .await
+            .into_iter()
             .map(|cpu| {
-                crate::bar::bar(cpu, self.colormap.map(cpu), self.bar_width, self.bar_height)
+                crate::draw::bar(cpu, self.colormap.map(cpu), self.bar_width, self.bar_height)
             })
-            .join(&crate::bar::space(self.space))
+            .join(&crate::draw::space(self.space))
     }
 
     fn box_clone(&self) -> crate::bar::DynBar {

@@ -1,3 +1,4 @@
+use crate::ticker::Ticker;
 use async_trait::async_trait;
 
 /// A statusbar for testing colormaps.
@@ -16,7 +17,7 @@ impl Clock {
         num_chars: u32,
         padding: u32,
     ) -> Box<Clock> {
-        let char_width = crate::config::read().await.font.width;
+        let char_width = crate::config::get().await.font.width;
 
         Box::new(Clock {
             color: color.into(),
@@ -34,7 +35,7 @@ impl crate::bar::Bar for Clock {
     }
 
     async fn render(&self) -> String {
-        let text = crate::state::read().await.time().format(&self.format);
+        let text = Ticker.time().await.format(&self.format);
         format!("^fg({}){}", self.color, text)
     }
 

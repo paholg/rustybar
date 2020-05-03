@@ -1,6 +1,7 @@
 use crate::Font;
 use tokio::sync;
 
+#[derive(Clone, Debug)]
 pub struct Config {
     pub font: Font,
     pub height: u32,
@@ -21,8 +22,8 @@ lazy_static::lazy_static! {
     static ref CONFIG: sync::RwLock<Config> = sync::RwLock::new(Config::new());
 }
 
-pub async fn read<'a>() -> sync::RwLockReadGuard<'a, Config> {
-    CONFIG.read().await
+pub async fn get() -> Config {
+    CONFIG.read().await.clone()
 }
 
 pub async fn write<'a>() -> sync::RwLockWriteGuard<'a, Config> {

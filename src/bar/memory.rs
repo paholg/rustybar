@@ -1,3 +1,4 @@
+use crate::ticker::Ticker;
 use async_trait::async_trait;
 
 #[derive(Clone, Debug)]
@@ -8,7 +9,7 @@ pub struct Memory {
 
 impl Memory {
     pub async fn new(colormap: crate::ColorMap, padding: u32) -> Box<Memory> {
-        let char_width = crate::config::read().await.font.width;
+        let char_width = crate::config::get().await.font.width;
 
         Box::new(Memory {
             colormap,
@@ -24,7 +25,9 @@ impl crate::bar::Bar for Memory {
     }
 
     async fn render(&self) -> String {
-        let memory = crate::state::read().await.free_memory();
+        let memory = Ticker.free_memory().await;
+
+        println!("Rendering memory bar");
 
         format!(
             "^fg({}){}",
