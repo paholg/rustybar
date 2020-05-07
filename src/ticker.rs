@@ -95,15 +95,19 @@ impl TickerState {
 pub struct Ticker;
 
 impl Ticker {
-    // /// Bytes recieved across all network interfaces since last update.
-    // pub async fn bytes_recieved(&self) -> u64 {
-    //     TICKER_STATE.read().await.bytes_recieved
-    // }
+    /// Bytes recieved across all network interfaces since last update.
+    pub async fn bytes_recieved(&self) -> u64 {
+        TICKER_STATE.read().await.bytes_recieved
+    }
 
-    // /// Bytes transmitted across all network interfaces since last update.
-    // pub async fn bytes_transmitted(&self) -> u64 {
-    //     TICKER_STATE.read().await.bytes_transmitted
-    // }
+    /// Bytes transmitted across all network interfaces since last update.
+    pub async fn bytes_transmitted(&self) -> u64 {
+        TICKER_STATE.read().await.bytes_transmitted
+    }
+
+    pub async fn tick_duration(&self) -> Duration {
+        TICKER_STATE.read().await.tick_duration
+    }
 
     /// Maximum temperature of all cpus.
     pub async fn temperature(&self) -> f32 {
@@ -127,7 +131,7 @@ impl Ticker {
         TICKER_STATE.read().await.system.get_free_memory() * 1000
     }
 
-    /// Free memory in bytes
+    /// Clock time
     pub async fn time(&self) -> chrono::DateTime<chrono::Local> {
         TICKER_STATE.read().await.time
     }
@@ -142,19 +146,15 @@ impl Ticker {
             (ticker_lock.bar_config.clone(), ticker_lock.screens.clone())
         };
 
-        println!("stopping");
         for bar in &bars {
             bar.stop().await;
         }
-        println!("stopped");
 
-        println!("starting");
         for bar in &bars {
             if let Some(screen) = screens.iter().find(|&&screen| screen.id == bar.screen_id) {
                 bar.start(screen).await;
             }
         }
-        println!("started");
     }
 }
 

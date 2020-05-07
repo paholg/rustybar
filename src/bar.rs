@@ -7,7 +7,8 @@ use tokio::{
 mod clock;
 mod cpu;
 mod memory;
-pub mod stdin;
+mod network;
+mod stdin;
 mod temp;
 
 use crate::ticker::Ticker;
@@ -15,6 +16,7 @@ use crate::updater::Updater;
 pub use clock::Clock;
 pub use cpu::Cpu;
 pub use memory::Memory;
+pub use network::Network;
 pub use stdin::Stdin;
 pub use temp::Temp;
 
@@ -68,7 +70,7 @@ impl RunningBar {
                 "-ta",
                 "l",
                 "-e",
-                "onstart=raise",
+                "onstart=lower",
                 "-xs",
                 "0",
             ])

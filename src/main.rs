@@ -13,8 +13,8 @@ fn main() {
 }
 
 async fn tokio_main() {
-    let font = rustybar::Font::new("Monospace-12", 12);
-    let height = 22;
+    let font = rustybar::Font::new("Monospace-14", 14);
+    let height = 24;
     let ch = font.width;
 
     // Spacemacs dark colors
@@ -75,6 +75,20 @@ async fn tokio_main() {
             .await,
         ],
         vec![
+            bar::Network::new(
+                [
+                    (0.0, bg2.into()),
+                    (1e3, bg1.into()),
+                    (10e3, aqua.into()),
+                    (100e3, blue.into()),
+                    (1e6, magenta.into()),
+                    (50e6, red.into()),
+                ]
+                .iter()
+                .collect(),
+                4 * ch,
+            )
+            .await,
             bar::Clock::new(blue, "%a %Y-%m-%d", 14, 2 * ch).await,
             bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await,
         ],
