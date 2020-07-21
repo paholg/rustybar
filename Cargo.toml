@@ -5,7 +5,7 @@
   edition = "2018"
 
 [dependencies]
-  async-trait = "*"
+  async-trait = "0.1"
   chrono = "0.4"
   debug_stub_derive = "0.3"
   directories = "0.8"
@@ -20,8 +20,8 @@
   slog-term = "2.4"
   slog-scope = "4.0"
   structopt = "0.2"
-  sysinfo = "*"
-  tokio = { version = "*", features = ["full"] }
+  sysinfo = "0.14"
+  tokio = { version = "0.2", features = ["full"] }
   toml = "0.4"
-  bytefmt = "*"
-  itertools = "*"
+  bytefmt = "0.1"
+  itertools = "0.9"

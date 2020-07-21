@@ -1,7 +1,6 @@
 use bar::DynBar;
 pub use bytes::format_bytes;
 pub use color::{Color, ColorMap};
-use screen::Screen;
 use ticker::Ticker;
 
 pub mod bar;
