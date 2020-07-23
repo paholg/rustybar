@@ -60,9 +60,10 @@ async fn tokio_main() {
                 ]
                 .iter()
                 .collect(),
-                20,
+                40,
+                80,
                 16,
-                4,
+                ch,
                 ch * 2,
             )
             .await,

@@ -126,6 +126,17 @@ impl Ticker {
             .collect()
     }
 
+    /// Fractioal usage for overall cpu in the range [0.0, 1.0].
+    pub async fn global_cpu(&self) -> f32 {
+        TICKER_STATE
+            .read()
+            .await
+            .system
+            .get_global_processor_info()
+            .get_cpu_usage()
+            / 100.0
+    }
+
     /// Free memory in bytes
     pub async fn free_memory(&self) -> u64 {
         TICKER_STATE.read().await.system.get_free_memory() * 1000

@@ -6,6 +6,8 @@
 
 [dependencies]
   async-trait = "0.1"
+  battery = "0.7"
+  bytefmt = "0.1"
   chrono = "0.4"
   debug_stub_derive = "0.3"
   directories = "0.8"
@@ -17,11 +19,9 @@
   serde_derive = "1.0"
   slog = "2.4"
   slog-async = "2.3"
-  slog-term = "2.4"
   slog-scope = "4.0"
+  slog-term = "2.4"
   structopt = "0.2"
   sysinfo = "0.14"
   tokio = { version = "0.2", features = ["full"] }
   toml = "0.4"
-  bytefmt = "0.1"
-  itertools = "0.9"
