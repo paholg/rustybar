@@ -13,7 +13,7 @@ fn main() {
 }
 
 async fn tokio_main() {
-    let font = rustybar::Font::new("Monospace-14", 14);
+    let font = rustybar::Font::new("Monospace-12", 12);
     let height = 24;
     let ch = font.width;
 

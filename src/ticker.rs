@@ -157,8 +157,8 @@ impl Ticker {
     }
 
     /// Free memory in bytes
-    pub async fn free_memory(&self) -> u64 {
-        TICKER_STATE.read().await.system.get_free_memory() * 1000
+    pub async fn available_memory(&self) -> u64 {
+        TICKER_STATE.read().await.system.get_available_memory() * 1000
     }
 
     /// Clock time

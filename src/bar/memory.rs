@@ -25,7 +25,7 @@ impl crate::bar::Bar for Memory {
     }
 
     async fn render(&self) -> String {
-        let memory = Ticker.free_memory().await;
+        let memory = Ticker.available_memory().await;
 
         format!(
             "^fg({}){}",
