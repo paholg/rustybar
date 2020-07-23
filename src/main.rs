@@ -90,6 +90,27 @@ async fn tokio_main() {
                 4 * ch,
             )
             .await,
+            bar::Battery::new(
+                [
+                    (0.0, red.into()),
+                    (0.3, magenta.into()),
+                    (0.7, blue.into()),
+                    (1.0, aqua.into()),
+                ]
+                .iter()
+                .collect(),
+                bar::BatteryColors {
+                    charge: aqua.into(),
+                    discharge: red.into(),
+                    unknown: magenta.into(),
+                },
+                40,
+                16,
+                ch,
+                ch,
+                ch * 2,
+            )
+            .await,
             bar::Clock::new(blue, "%a %Y-%m-%d", 14, 2 * ch).await,
             bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await,
         ],

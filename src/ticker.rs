@@ -28,6 +28,9 @@ pub struct TickerState {
     /// Maximum temperature of all cpus.
     temperature: f32,
 
+    /// Battery percentage if one exists.
+    battery: (f32, battery::State),
+
     running: bool,
 
     pub screens: Vec<Screen>,
@@ -54,6 +57,7 @@ impl TickerState {
             bytes_recieved: 0,
             bytes_transmitted: 0,
             temperature: 0.0,
+            battery: (0.0, battery::State::Unknown),
             running: false,
             bars_to_update: Vec::new(),
             screens: crate::screen::get_screens(),
@@ -87,6 +91,16 @@ impl TickerState {
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(-1.0);
 
+        // TODO: Should not be creating a new Manager each time.
+        self.battery = battery::Manager::new()
+            .unwrap()
+            .batteries()
+            .unwrap()
+            .next()
+            .map(Result::unwrap)
+            .map(|b| (b.state_of_charge().value, b.state()))
+            .unwrap_or_default();
+
         self.screens = crate::screen::get_screens();
     }
 }
@@ -112,6 +126,11 @@ impl Ticker {
     /// Maximum temperature of all cpus.
     pub async fn temperature(&self) -> f32 {
         TICKER_STATE.read().await.temperature
+    }
+
+    /// Maximum temperature of all cpus.
+    pub async fn battery(&self) -> (f32, battery::State) {
+        TICKER_STATE.read().await.battery
     }
 
     /// Fractioal usage for all cpus in the range [0.0, 1.0].

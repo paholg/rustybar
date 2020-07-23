@@ -1,115 +1,72 @@
-use crate::colormap::{ColorMap, ColorMapConfig};
+use crate::ticker::Ticker;
+use crate::Color;
+use async_trait::async_trait;
 
-use failure;
-use std::{fs, io::Read, io::Write, path::PathBuf};
-
-use crate::bar::{Bar, WriteBar, Writer};
-
-#[derive(Debug, Deserialize)]
-pub struct BatteryConfig {
-    #[serde(default)]
-    battery_number: u32,
-    #[serde(default)]
-    colormap: ColorMapConfig,
-    height: u32,
-    space: u32,
-    width: u32,
-}
-
-/// A statusbar for battery information. All data is gathered from '/sys/class/power_supply/BAT#/'
+/// A statusbar for battery information.
 #[derive(Debug, Clone)]
 pub struct Battery {
-    bat_num: u32,
-    path_capacity: PathBuf,
-    path_status: PathBuf,
-    cmap: ColorMap,
-    // the size of bars and spaces between them
+    colormap: crate::ColorMap,
+    bar_width: u32,
+    bar_height: u32,
     char_width: u32,
-    width: u32,
     space: u32,
-    height: u32,
+    padding: u32,
+    colors: BatteryColors,
+}
+
+#[derive(Debug, Clone)]
+pub struct BatteryColors {
+    pub charge: Color,
+    pub discharge: Color,
+    pub unknown: Color,
 }
 
 impl Battery {
-    pub fn from_config(config: &BatteryConfig, char_width: u32) -> Result<Battery, failure::Error> {
-        let (path_capacity, path_status) = Battery::paths(config.battery_number)?;
-        Ok(Battery {
-            bat_num: config.battery_number,
-            path_capacity,
-            path_status,
-            cmap: ColorMap::from_config(&config.colormap)?,
+    pub async fn new(
+        colormap: crate::ColorMap,
+        state_colors: BatteryColors,
+        bar_width: u32,
+        bar_height: u32,
+        char_width: u32,
+        space: u32,
+        padding: u32,
+    ) -> Box<Battery> {
+        Box::new(Battery {
+            colormap,
+            colors: state_colors,
+            bar_width,
+            bar_height,
             char_width,
-            width: config.width,
-            space: config.space,
-            height: config.height,
+            space,
+            padding,
         })
-    }
-
-    fn paths(bat_num: u32) -> Result<(PathBuf, PathBuf), failure::Error> {
-        let base_path: PathBuf = format!("/sys/class/power_supply/BAT{}/", bat_num).into();
-        if !base_path.exists() {
-            bail!(
-                "The selected battery directory:\n\t{}\ndoes not exist and is needed for the battery bar. Perhaps you meant a different battery number or perhaps it isn't there. Go ahead and report this with the output of \"ls /sys/class/power_supply/",
-                base_path.display()
-            );
-        }
-        let mut path_capacity = base_path.clone();
-        path_capacity.push("capacity");
-        if !path_capacity.exists() {
-            bail!(
-                "The file:\n\t{}\ndoes not exist. It almost certainly should and is needed for the battery bar.",
-                path_capacity.display()
-            );
-        }
-
-        let mut path_status = base_path.clone();
-        path_status.push("status");
-        if !path_status.exists() {
-            bail!(
-                "The file:\n\t{}\ndoes not exist. It almost certainly should and is needed for the battery bar.",
-                path_status.display()
-            );
-        }
-
-        Ok((path_capacity, path_status))
     }
 }
 
-impl Bar for Battery {
-    fn len(&self) -> u32 {
-        self.width + self.space + self.char_width
+#[async_trait]
+impl crate::bar::Bar for Battery {
+    fn width(&self) -> u32 {
+        self.bar_width + self.space + self.char_width + self.padding
     }
 
-    fn write(&mut self, w: &mut Writer) -> Result<(), failure::Error> {
-        let cap_string = {
-            let mut string = String::new();
-            fs::File::open(&self.path_capacity)?.read_to_string(&mut string)?;
-            string
-        };
-        let capacity: u8 = cap_string.trim().parse()?;
+    async fn render(&self) -> String {
+        let (val, state) = Ticker.battery().await;
+        let bar = crate::draw::bar(val, self.colormap.map(val), self.bar_width, self.bar_height);
+        let space = crate::draw::space(self.space);
 
-        w.bar(
-            f32::from(capacity) / 100.,
-            self.cmap.map(capacity),
-            self.width,
-            self.height,
-        )?;
-        w.space(self.space)?;
-
-        let status_string = {
-            let mut string = String::new();
-            fs::File::open(&self.path_status)?.read_to_string(&mut string)?;
-            string
+        let (ch, color) = match state {
+            battery::State::Unknown => ('*', self.colors.unknown),
+            battery::State::Charging => ('+', self.colors.charge),
+            battery::State::Discharging => ('-', self.colors.discharge),
+            battery::State::Empty => ('!', self.colors.unknown),
+            battery::State::Full => (' ', self.colors.charge),
+            battery::State::__Nonexhaustive => ('*', self.colors.unknown),
         };
 
-        let status = match status_string.trim() {
-            "Charging" => "^fg(#00ff00)+",
-            "Discharging" => "^fg(#ff0000)-",
-            "Full" => " ",
-            _ => "^fg(#00ffff)*",
-        };
-        w.write_all(status.as_bytes())?;
+        format!("{}{}^fg({}){}", bar, space, color, ch)
+    }
 
-        Ok(())
+    fn box_clone(&self) -> crate::bar::DynBar {
+        Box::new(self.clone())
     }
 }

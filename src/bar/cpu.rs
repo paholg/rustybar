@@ -1,7 +1,7 @@
 use crate::ticker::Ticker;
 use async_trait::async_trait;
 
-/// A statusbar for testing colormaps.
+/// A statusbar for cpu use.
 #[derive(Clone, Debug)]
 pub struct Cpu {
     colormap: crate::ColorMap,

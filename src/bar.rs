@@ -4,6 +4,7 @@ use tokio::{
     process,
 };
 
+mod battery;
 mod clock;
 mod cpu;
 mod memory;
@@ -11,6 +12,7 @@ mod network;
 mod stdin;
 mod temp;
 
+pub use self::battery::{Battery, BatteryColors};
 use crate::ticker::Ticker;
 use crate::updater::Updater;
 pub use clock::Clock;
