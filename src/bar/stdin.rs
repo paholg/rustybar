@@ -1,5 +1,8 @@
-use crate::{stdin, updater::Updater};
+use std::sync::Arc;
+
 use async_trait::async_trait;
+
+use crate::producer::SingleQueue;
 
 /// A statusbar for stdin.
 #[derive(Clone, Debug)]
@@ -15,19 +18,17 @@ impl Stdin {
 
 #[async_trait]
 impl crate::bar::Bar for Stdin {
+    type Data = String;
+
     fn width(&self) -> u32 {
         self.width
     }
 
-    async fn render(&self) -> String {
-        stdin::Stdin.line().await
+    fn render(&self, data: &Self::Data) -> String {
+        data.clone()
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
-    }
-
-    fn updater(&self) -> Box<dyn Updater> {
-        Box::new(stdin::Stdin)
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::STDIN.clone()
     }
 }

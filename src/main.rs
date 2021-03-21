@@ -1,19 +1,33 @@
-use rustybar::bar;
+use rustybar::{
+    bar::{self, Bar},
+    util::screen::get_screens,
+    RustyBar,
+};
 use std::time::Duration;
 use tokio;
 
-fn main() {
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let mut screens = Vec::new();
+    let mut bars;
 
-    runtime.block_on(async { tokio_main().await });
+    loop {
+        let new_screens = get_screens();
+        if new_screens != screens {
+            screens = new_screens;
+            bars = Vec::new();
+            for screen in &screens {
+                let mut bar = init_bar().await;
+                bar.start(screen).await;
+                bars.push(bar);
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
-async fn tokio_main() {
-    let font = rustybar::Font::new("Monospace-12", 12);
+async fn init_bar() -> RustyBar {
+    let font = rustybar::Font::new("Monospace-12".into(), 12);
     let height = 24;
     let ch = font.width;
 
@@ -31,13 +45,13 @@ async fn tokio_main() {
         let mut config = rustybar::config::write().await;
         config.font = font;
         config.height = height;
-        config.background = bg4;
+        config.background = bg4.into();
     }
 
-    let rb = rustybar::RustyBar::new(
-        0,
-        vec![bar::Stdin::new(100).await],
+    rustybar::RustyBar::new(
+        vec![bar::Stdin::new(100).await.start()],
         vec![
+            bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await.start(),
             bar::Temp::new(
                 [
                     (40.0, aqua.into()),
@@ -49,7 +63,8 @@ async fn tokio_main() {
                 .collect(),
                 ch * 2,
             )
-            .await,
+            .await
+            .start(),
             bar::Cpu::new(
                 [
                     (0.0, bg2.into()),
@@ -66,14 +81,16 @@ async fn tokio_main() {
                 ch,
                 ch * 2,
             )
-            .await,
+            .await
+            .start(),
             bar::Memory::new(
                 [(1e9, red.into()), (3e9, blue.into()), (8e9, aqua.into())]
                     .iter()
                     .collect(),
                 0,
             )
-            .await,
+            .await
+            .start(),
         ],
         vec![
             bar::Network::new(
@@ -89,7 +106,8 @@ async fn tokio_main() {
                 .collect(),
                 4 * ch,
             )
-            .await,
+            .await
+            .start(),
             bar::Battery::new(
                 [
                     (0.0, red.into()),
@@ -110,18 +128,12 @@ async fn tokio_main() {
                 ch,
                 ch * 2,
             )
-            .await,
-            bar::Clock::new(blue, "%a %Y-%m-%d", 14, 2 * ch).await,
-            bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await,
+            .await
+            .start(),
+            bar::Clock::new(blue, "%a %Y-%m-%d", 14, 2 * ch)
+                .await
+                .start(),
+            bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await.start(),
         ],
-    );
-    let mut rb2 = rb.clone();
-    rb2.screen_id = 1;
-    let mut rb3 = rb.clone();
-    rb3.screen_id = 2;
-
-    rustybar::start(vec![rb, rb2, rb3]).await;
-
-    // FIXME
-    tokio::time::delay_for(Duration::from_secs(100000)).await;
+    )
 }

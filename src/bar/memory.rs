@@ -1,5 +1,6 @@
-use crate::ticker::Ticker;
-use async_trait::async_trait;
+use std::sync::Arc;
+
+use crate::producer::SingleQueue;
 
 #[derive(Clone, Debug)]
 pub struct Memory {
@@ -18,14 +19,15 @@ impl Memory {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Memory {
+    type Data = crate::producer::SystemInfo;
+
     fn width(&self) -> u32 {
         self.width
     }
 
-    async fn render(&self) -> String {
-        let memory = Ticker.available_memory().await;
+    fn render(&self, data: &Self::Data) -> String {
+        let memory = data.available_memory;
 
         format!(
             "^fg({}){}",
@@ -34,7 +36,7 @@ impl crate::bar::Bar for Memory {
         )
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::SYSTEM.clone()
     }
 }

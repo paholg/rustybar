@@ -1,5 +1,7 @@
-use crate::ticker::Ticker;
-use async_trait::async_trait;
+use chrono::{DateTime, Local};
+use std::sync::Arc;
+
+use crate::producer::SingleQueue;
 
 /// A statusbar for testing colormaps.
 #[derive(Clone, Debug)]
@@ -28,18 +30,19 @@ impl Clock {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Clock {
+    type Data = DateTime<Local>;
+
     fn width(&self) -> u32 {
         self.width
     }
 
-    async fn render(&self) -> String {
-        let text = Ticker.time().await.format(&self.format);
+    fn render(&self, data: &Self::Data) -> String {
+        let text = data.format(&self.format);
         format!("^fg({}){}", self.color, text)
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::CLOCK.clone()
     }
 }

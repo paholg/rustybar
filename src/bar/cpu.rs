@@ -1,5 +1,6 @@
-use crate::ticker::Ticker;
-use async_trait::async_trait;
+use std::sync::Arc;
+
+use crate::{producer::SingleQueue, util::draw};
 
 /// A statusbar for cpu use.
 #[derive(Clone, Debug)]
@@ -32,36 +33,37 @@ impl Cpu {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Cpu {
+    type Data = crate::producer::SystemInfo;
+
     fn width(&self) -> u32 {
         self.min_max_width * 2 + self.avg_width + self.space * 2 + self.padding
     }
 
-    async fn render(&self) -> String {
-        let avg = Ticker.global_cpu().await;
-        let cpus = Ticker.cpus().await;
-        let (min, max) = cpus
-            .into_iter()
-            .fold((f32::MAX, f32::MIN), |(min, max), cpu| {
+    fn render(&self, data: &Self::Data) -> String {
+        let avg = data.global_cpu;
+        let (min, max) = data
+            .cpus
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(min, max), &cpu| {
                 (min.min(cpu), max.max(cpu))
             });
 
-        let mut result = crate::draw::bar(
+        let mut result = draw::bar(
             min,
             self.colormap.map(min),
             self.min_max_width,
             self.bar_height,
         );
-        result.push_str(&crate::draw::space(self.space));
-        result.push_str(&crate::draw::bar(
+        result.push_str(&draw::space(self.space));
+        result.push_str(&draw::bar(
             avg,
             self.colormap.map(avg),
             self.avg_width,
             self.bar_height,
         ));
-        result.push_str(&crate::draw::space(self.space));
-        result.push_str(&crate::draw::bar(
+        result.push_str(&draw::space(self.space));
+        result.push_str(&draw::bar(
             max,
             self.colormap.map(max),
             self.min_max_width,
@@ -71,7 +73,7 @@ impl crate::bar::Bar for Cpu {
         result
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::SYSTEM.clone()
     }
 }

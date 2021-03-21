@@ -1,4 +1,4 @@
-pub fn bar(val: f32, color: crate::color::Color, width: u32, height: u32) -> String {
+pub fn bar(val: f32, color: super::color::Color, width: u32, height: u32) -> String {
     let wfill = (val * (width as f32) + 0.5) as u32;
     let wempty = width - wfill;
     format!(

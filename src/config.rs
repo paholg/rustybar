@@ -5,15 +5,15 @@ use tokio::sync;
 pub struct Config {
     pub font: Font,
     pub height: u32,
-    pub background: &'static str,
+    pub background: String,
 }
 
 impl Config {
     fn new() -> Config {
         Config {
             height: 22,
-            font: Font::new("Monospace-12", 12),
-            background: "#222222",
+            font: Font::new("Monospace-12".into(), 12),
+            background: "#222222".into(),
         }
     }
 }

@@ -1,5 +1,6 @@
-use crate::ticker::Ticker;
-use async_trait::async_trait;
+use std::sync::Arc;
+
+use crate::producer::SingleQueue;
 
 #[derive(Clone, Debug)]
 pub struct Network {
@@ -18,17 +19,18 @@ impl Network {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Network {
+    type Data = crate::producer::SystemInfo;
+
     fn width(&self) -> u32 {
         self.width
     }
 
-    async fn render(&self) -> String {
-        let duration = Ticker.tick_duration().await;
+    fn render(&self, data: &Self::Data) -> String {
+        let duration = data.tick_duration;
 
-        let recieved = Ticker.bytes_recieved().await;
-        let transmitted = Ticker.bytes_transmitted().await;
+        let recieved = data.bytes_received;
+        let transmitted = data.bytes_transmitted;
 
         let rps = recieved as f32 / duration.as_secs_f32();
         let tps = transmitted as f32 / duration.as_secs_f32();
@@ -42,7 +44,7 @@ impl crate::bar::Bar for Network {
         )
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::SYSTEM.clone()
     }
 }

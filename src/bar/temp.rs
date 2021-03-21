@@ -1,7 +1,7 @@
-use crate::ticker::Ticker;
-use async_trait::async_trait;
+use std::sync::Arc;
 
-/// A statusbar for cpu information. All data is gathered from /proc/stat and /proc/cpuinfo.
+use crate::producer::SingleQueue;
+
 #[derive(Clone, Debug)]
 pub struct Temp {
     colormap: crate::ColorMap,
@@ -19,19 +19,20 @@ impl Temp {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Temp {
+    type Data = crate::producer::SystemInfo;
+
     fn width(&self) -> u32 {
         self.width
     }
 
-    async fn render(&self) -> String {
-        let temp = Ticker.temperature().await;
+    fn render(&self, data: &Self::Data) -> String {
+        let temp = data.temperature;
 
         format!("^fg({}){:3.0} °C", self.colormap.map(temp), temp)
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::SYSTEM.clone()
     }
 }

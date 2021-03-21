@@ -1,17 +1,12 @@
-use bar::DynBar;
-pub use bytes::format_bytes;
-pub use color::{Color, ColorMap};
-use ticker::Ticker;
+use bar::{BarData, BarParams};
+pub use util::bytes::format_bytes;
+pub use util::color::{Color, ColorMap};
+use util::screen::Screen;
 
 pub mod bar;
-mod bytes;
-mod color;
 pub mod config;
-pub mod draw;
-pub mod screen;
-mod stdin;
-mod ticker;
-mod updater;
+pub mod producer;
+pub mod util;
 
 /// A convenience macro for creating a static Regex, for repeated use at only one call-site.  Copied
 /// from https://github.com/Canop/lazy-regex
@@ -27,76 +22,32 @@ macro_rules! regex {
 
 #[derive(Clone, Debug)]
 pub struct Font {
-    pub name: &'static str,
+    pub name: String,
     pub width: u32,
 }
 
 impl Font {
-    pub const fn new(name: &'static str, width: u32) -> Font {
+    pub const fn new(name: String, width: u32) -> Font {
         Font { name, width }
     }
 }
 
-#[derive(Debug)]
 pub struct RustyBar {
-    pub screen_id: u32,
-    pub left: Vec<DynBar>,
-    pub center: Vec<DynBar>,
-    pub right: Vec<DynBar>,
-}
-
-impl Clone for RustyBar {
-    fn clone(&self) -> Self {
-        RustyBar {
-            screen_id: self.screen_id,
-            left: self.left.iter().map(|b| b.box_clone()).collect(),
-            center: self.center.iter().map(|b| b.box_clone()).collect(),
-            right: self.right.iter().map(|b| b.box_clone()).collect(),
-        }
-    }
+    pub left: Vec<BarData>,
+    pub center: Vec<BarData>,
+    pub right: Vec<BarData>,
 }
 
 impl RustyBar {
-    pub fn new(
-        screen_id: u32,
-        left: Vec<DynBar>,
-        center: Vec<DynBar>,
-        right: Vec<DynBar>,
-    ) -> RustyBar {
+    pub fn new(left: Vec<BarData>, center: Vec<BarData>, right: Vec<BarData>) -> RustyBar {
         RustyBar {
-            screen_id,
             left,
             center,
             right,
         }
     }
 
-    pub async fn stop(&self) {
-        for bar in self
-            .left
-            .iter()
-            .chain(self.center.iter())
-            .chain(self.right.iter())
-        {
-            bar.updater().clear().await;
-        }
-    }
-
-    pub async fn start(&self, screen: &screen::Screen) {
-        async fn start_bar(bar: DynBar, x: u32, y: u32, pad: u32, config: &config::Config) {
-            let width = bar.width();
-            let running_bar = bar::RunningBar::start(
-                bar,
-                config.font.name,
-                x,
-                y,
-                width + pad,
-                config.height,
-                config.background,
-            );
-            running_bar.register().await;
-        }
-
+    pub async fn start(&mut self, screen: &Screen) {
         let config = config::get().await;
         let mut x = screen.x;
 
@@ -104,34 +55,55 @@ impl RustyBar {
         let right_width: u32 = self.right.iter().map(|b| b.width()).sum();
         let center_x = (screen.width - center_width) / 2 + screen.x;
 
-        for (i, bar) in self.left.iter().enumerate() {
-            let pad = if i == self.left.len() - 1 {
+        let last_idx = self.left.len() - 1;
+        for (i, bar) in self.left.iter_mut().enumerate() {
+            let pad = if i == last_idx {
                 center_x - x - bar.width()
             } else {
                 0
             };
-            start_bar(bar.box_clone(), x, screen.y, pad, &config).await;
+            let params = BarParams {
+                x,
+                y: screen.y,
+                w: bar.width() + pad,
+                font: config.font.name.clone(),
+                bg: config.background.clone(),
+                h: config.height,
+            };
+            bar.init(params).await;
             x += bar.width() + pad;
         }
 
-        for (i, bar) in self.center.iter().enumerate() {
-            let pad = if i == self.center.len() - 1 {
+        let last_idx = self.center.len() - 1;
+        for (i, bar) in self.center.iter_mut().enumerate() {
+            let pad = if i == last_idx {
                 screen.x + screen.width - x - right_width - bar.width()
             } else {
                 0
             };
-            start_bar(bar.box_clone(), x, screen.y, pad, &config).await;
+            let params = BarParams {
+                x,
+                y: screen.y,
+                w: bar.width() + pad,
+                font: config.font.name.clone(),
+                bg: config.background.clone(),
+                h: config.height,
+            };
+            bar.init(params).await;
             x += bar.width() + pad;
         }
 
-        for bar in &self.right {
-            start_bar(bar.box_clone(), x, screen.y, 0, &config).await;
+        for bar in &mut self.right {
+            let params = BarParams {
+                x,
+                y: screen.y,
+                w: bar.width(),
+                font: config.font.name.clone(),
+                bg: config.background.clone(),
+                h: config.height,
+            };
+            bar.init(params).await;
             x += bar.width();
         }
     }
-}
-
-pub async fn start(bars: Vec<RustyBar>) {
-    Ticker.set_bar_config(bars).await;
-    Ticker.restart().await;
 }

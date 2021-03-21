@@ -1,6 +1,6 @@
-use crate::ticker::Ticker;
+use crate::producer::SingleQueue;
 use crate::Color;
-use async_trait::async_trait;
+use std::sync::Arc;
 
 /// A statusbar for battery information.
 #[derive(Debug, Clone)]
@@ -43,16 +43,18 @@ impl Battery {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Battery {
+    type Data = (f32, battery::State);
+
     fn width(&self) -> u32 {
         self.bar_width + self.space + self.char_width + self.padding
     }
 
-    async fn render(&self) -> String {
-        let (val, state) = Ticker.battery().await;
-        let bar = crate::draw::bar(val, self.colormap.map(val), self.bar_width, self.bar_height);
-        let space = crate::draw::space(self.space);
+    fn render(&self, data: &Self::Data) -> String {
+        let (val, state) = *data;
+        let bar =
+            crate::util::draw::bar(val, self.colormap.map(val), self.bar_width, self.bar_height);
+        let space = crate::util::draw::space(self.space);
 
         let (ch, color) = match state {
             battery::State::Unknown => ('*', self.colors.unknown),
@@ -66,7 +68,7 @@ impl crate::bar::Bar for Battery {
         format!("{}{}^fg({}){}", bar, space, color, ch)
     }
 
-    fn box_clone(&self) -> crate::bar::DynBar {
-        Box::new(self.clone())
+    fn data_queue(&self) -> SingleQueue<Arc<Self::Data>> {
+        crate::producer::BATTERY.clone()
     }
 }
