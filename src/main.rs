@@ -51,7 +51,6 @@ async fn init_bar() -> RustyBar {
     rustybar::RustyBar::new(
         vec![bar::Stdin::new(100).await.start()],
         vec![
-            bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await.start(),
             bar::Temp::new(
                 [
                     (40.0, aqua.into()),
