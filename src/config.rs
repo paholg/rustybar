@@ -1,11 +1,11 @@
-use crate::Font;
+use crate::{Color, Font};
 use tokio::sync;
 
 #[derive(Clone, Debug)]
 pub struct Config {
     pub font: Font,
     pub height: u32,
-    pub background: String,
+    pub background: Color,
 }
 
 impl Config {

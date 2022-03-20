@@ -67,7 +67,7 @@ impl RustyBar {
                 y: screen.y,
                 w: bar.width() + pad,
                 font: config.font.name.clone(),
-                bg: config.background.clone(),
+                bg: config.background,
                 h: config.height,
             };
             bar.init(params).await;
@@ -86,7 +86,7 @@ impl RustyBar {
                 y: screen.y,
                 w: bar.width() + pad,
                 font: config.font.name.clone(),
-                bg: config.background.clone(),
+                bg: config.background,
                 h: config.height,
             };
             bar.init(params).await;
@@ -99,7 +99,7 @@ impl RustyBar {
                 y: screen.y,
                 w: bar.width(),
                 font: config.font.name.clone(),
-                bg: config.background.clone(),
+                bg: config.background,
                 h: config.height,
             };
             bar.init(params).await;

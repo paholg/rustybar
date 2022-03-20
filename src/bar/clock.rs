@@ -1,20 +1,19 @@
 use chrono::{DateTime, Local};
 use std::sync::Arc;
 
-use crate::producer::SingleQueue;
+use crate::{producer::SingleQueue, Color};
 
 /// A statusbar for testing colormaps.
 #[derive(Clone, Debug)]
 pub struct Clock {
-    color: String,
+    color: Color,
     format: String,
-    char_width: u32,
     width: u32,
 }
 
 impl Clock {
     pub async fn new(
-        color: impl Into<String>,
+        color: impl Into<Color>,
         format: impl Into<String>,
         num_chars: u32,
         padding: u32,
@@ -24,7 +23,6 @@ impl Clock {
         Box::new(Clock {
             color: color.into(),
             format: format.into(),
-            char_width,
             width: char_width * num_chars + padding,
         })
     }

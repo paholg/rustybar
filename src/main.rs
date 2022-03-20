@@ -4,7 +4,6 @@ use rustybar::{
     RustyBar,
 };
 use std::time::Duration;
-use tokio;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -32,45 +31,40 @@ async fn init_bar() -> RustyBar {
     let ch = font.width;
 
     // Spacemacs dark colors
-    let bg1 = "#292b2e";
-    let bg2 = "#1f2022";
-    let bg4 = "#0a0814";
-    let aqua = "#2d9574";
-    let blue = "#4f97d7";
-    let magenta = "#a31db1";
-    let red = "#f2241f";
+    let bg1 = "#292b2e".into();
+    let bg2 = "#1f2022".into();
+    let bg4 = "#0a0814".into();
+    let aqua = "#2d9574".into();
+    let blue = "#4f97d7".into();
+    let magenta = "#a31db1".into();
+    let red = "#f2241f".into();
 
     {
         // TODO: Move all this to methods
         let mut config = rustybar::config::write().await;
         config.font = font;
         config.height = height;
-        config.background = bg4.into();
+        config.background = bg4;
     }
 
     rustybar::RustyBar::new(
         vec![bar::Stdin::new(100).await.start()],
         vec![
             bar::Temp::new(
-                [
-                    (40.0, aqua.into()),
-                    (60.0, blue.into()),
-                    (80.0, magenta.into()),
-                    (100.0, red.into()),
-                ]
-                .iter()
-                .collect(),
+                [(40.0, aqua), (60.0, blue), (80.0, magenta), (100.0, red)]
+                    .iter()
+                    .collect(),
                 ch * 2,
             )
             .await
             .start(),
             bar::Cpu::new(
                 [
-                    (0.0, bg2.into()),
-                    (0.2, bg1.into()),
-                    (0.4, aqua.into()),
-                    (0.8, magenta.into()),
-                    (1.0, red.into()),
+                    (0.0, bg2),
+                    (0.2, bg1),
+                    (0.4, aqua),
+                    (0.8, magenta),
+                    (1.0, red),
                 ]
                 .iter()
                 .collect(),
@@ -82,24 +76,19 @@ async fn init_bar() -> RustyBar {
             )
             .await
             .start(),
-            bar::Memory::new(
-                [(1e9, red.into()), (3e9, blue.into()), (8e9, aqua.into())]
-                    .iter()
-                    .collect(),
-                0,
-            )
-            .await
-            .start(),
+            bar::Memory::new([(1e9, red), (3e9, blue), (8e9, aqua)].iter().collect(), 0)
+                .await
+                .start(),
         ],
         vec![
             bar::Network::new(
                 [
-                    (0.0, bg2.into()),
-                    (1e3, bg1.into()),
-                    (10e3, aqua.into()),
-                    (100e3, blue.into()),
-                    (1e6, magenta.into()),
-                    (50e6, red.into()),
+                    (0.0, bg2),
+                    (1e3, bg1),
+                    (10e3, aqua),
+                    (100e3, blue),
+                    (1e6, magenta),
+                    (50e6, red),
                 ]
                 .iter()
                 .collect(),
@@ -108,18 +97,13 @@ async fn init_bar() -> RustyBar {
             .await
             .start(),
             bar::Battery::new(
-                [
-                    (0.0, red.into()),
-                    (0.3, magenta.into()),
-                    (0.7, blue.into()),
-                    (1.0, aqua.into()),
-                ]
-                .iter()
-                .collect(),
+                [(0.0, red), (0.3, magenta), (0.7, blue), (1.0, aqua)]
+                    .iter()
+                    .collect(),
                 bar::BatteryColors {
-                    charge: aqua.into(),
-                    discharge: red.into(),
-                    unknown: magenta.into(),
+                    charge: aqua,
+                    discharge: red,
+                    unknown: magenta,
                 },
                 40,
                 16,

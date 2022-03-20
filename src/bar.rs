@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::producer::SingleQueue;
+use crate::{producer::SingleQueue, Color};
 use tokio::{io::AsyncWriteExt, process, sync::oneshot, task::JoinHandle};
 
 mod battery;
@@ -59,7 +59,7 @@ pub struct BarParams {
     pub y: u32,
     pub w: u32,
     pub h: u32,
-    pub bg: String,
+    pub bg: Color,
     pub font: String,
 }
 
@@ -154,7 +154,7 @@ fn start_dzen(params: &BarParams) -> process::Child {
             "-h",
             &params.h.to_string(),
             "-bg",
-            &params.bg,
+            &params.bg.to_string(),
             "-ta",
             "l",
             "-e",

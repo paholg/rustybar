@@ -1,13 +1,8 @@
 use chrono::{DateTime, Local};
 use std::{sync::Arc, time::Duration};
 
+#[derive(Default)]
 pub struct Clock;
-
-impl Default for Clock {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 #[async_trait::async_trait]
 impl super::Producer for Clock {
