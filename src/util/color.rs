@@ -9,7 +9,7 @@ pub struct Color {
 }
 
 impl Color {
-    /// creates a Color object, guaranteeing that the colors are acceptable values.
+    /// Create a Color object
     pub fn new(red: u8, green: u8, blue: u8) -> Color {
         Color {
             r: red,
@@ -20,7 +20,7 @@ impl Color {
 }
 
 impl std::convert::From<&str> for Color {
-    /// expects a color in the format "#ffffff", panics otherwise
+    /// Expect a color in the format "#ffffff", panicking otherwise
     fn from(s: &str) -> Self {
         if s.len() != 7 || s.bytes().next() != Some(b'#') {
             panic!("Invalid string");
