@@ -1,4 +1,5 @@
 *~
 /target
 /doc
-Cargo.lock
+.direnv
+result
