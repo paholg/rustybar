@@ -7,10 +7,14 @@ pub struct Battery;
 
 impl Battery {
     fn get(&self) -> (f32, State) {
+        self.get_inner().unwrap_or((0.0, State::Unknown))
+    }
+
+    fn get_inner(&self) -> Option<(f32, State)> {
         // TODO: don't construct manager every read.
         let manager = battery::Manager::new().unwrap();
-        let battery = manager.batteries().unwrap().next().unwrap().unwrap();
-        (battery.state_of_charge().value, battery.state())
+        let battery = manager.batteries().ok()?.next()?.ok()?;
+        Some((battery.state_of_charge().value, battery.state()))
     }
 }
 
