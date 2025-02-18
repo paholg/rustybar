@@ -3,7 +3,7 @@ struct Unit<'a> {
     name: &'a str,
 }
 
-impl<'a> Unit<'a> {
+impl Unit<'_> {
     const fn new(value: f32, name: &str) -> Unit {
         Unit { value, name }
     }

@@ -141,7 +141,7 @@ where
 
 fn start_dzen(params: &BarParams) -> process::Child {
     process::Command::new("dzen2")
-        .args(&[
+        .args([
             "-dock",
             "-fn",
             &params.font,
