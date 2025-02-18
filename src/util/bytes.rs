@@ -9,13 +9,20 @@ impl Unit<'_> {
     }
 }
 
+const K: f32 = 1024.0;
+const M: f32 = 1024.0 * K;
+const G: f32 = 1024.0 * M;
+const T: f32 = 1024.0 * G;
+const P: f32 = 1024.0 * T;
+const E: f32 = 1024.0 * P;
+
 const BYTE_UNITS: [Unit; 6] = [
-    Unit::new(1e3, "k"),
-    Unit::new(1e6, "M"),
-    Unit::new(1e9, "G"),
-    Unit::new(1e12, "T"),
-    Unit::new(1e15, "P"),
-    Unit::new(1e18, "E"),
+    Unit::new(K, "k"),
+    Unit::new(M, "M"),
+    Unit::new(G, "G"),
+    Unit::new(T, "T"),
+    Unit::new(P, "P"),
+    Unit::new(E, "E"),
 ];
 
 pub fn format_bytes(bytes: u64) -> String {

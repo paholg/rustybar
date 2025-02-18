@@ -1,6 +1,6 @@
 pub fn bar(val: f32, color: super::color::Color, width: u32, height: u32) -> String {
     let wfill = (val * (width as f32) + 0.5) as u32;
-    let wempty = width - wfill;
+    let wempty = width.saturating_sub(wfill);
     format!(
         "^fg({})^r({2}x{1})^ro({3}x{1})",
         color, height, wfill, wempty

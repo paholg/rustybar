@@ -2,39 +2,39 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use sysinfo::{self, ComponentExt, NetworkExt, NetworksExt, ProcessorExt, SystemExt};
+use sysinfo::{self, CpuRefreshKind, MemoryRefreshKind};
 
 pub struct System {
-    sysinfo: sysinfo::System,
+    system: sysinfo::System,
+    networks: sysinfo::Networks,
+    components: sysinfo::Components,
     last_tick: Instant,
 }
 
 impl System {
     fn get(&mut self) -> SystemInfo {
         let (bytes_received, bytes_transmitted) = self
-            .sysinfo
-            .get_networks()
+            .networks
             .iter()
-            .map(|(_name, network)| (network.get_received(), network.get_transmitted()))
+            .map(|(_name, network)| (network.received(), network.transmitted()))
             .fold((0, 0), |sum, (r, t)| (sum.0 + r, sum.1 + t));
 
         let temperature = self
-            .sysinfo
-            .get_components()
+            .components
             .iter()
-            .map(|c| c.get_temperature())
+            .flat_map(|c| c.temperature())
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(-1.0);
-        let available_memory = self.sysinfo.get_available_memory() * 1000;
+        let available_memory = self.system.available_memory();
 
         let cpus = self
-            .sysinfo
-            .get_processors()
+            .system
+            .cpus()
             .iter()
-            .map(|p| p.get_cpu_usage() / 100.0)
+            .map(|cpu| cpu.cpu_usage() / 100.0)
             .collect();
 
-        let global_cpu = self.sysinfo.get_global_processor_info().get_cpu_usage() / 100.0;
+        let global_cpu = self.system.global_cpu_usage() / 100.0;
 
         let now = Instant::now();
         let tick_duration = now.duration_since(self.last_tick);
@@ -54,17 +54,12 @@ impl System {
 
 impl Default for System {
     fn default() -> Self {
-        let sysinfo = sysinfo::System::new_with_specifics(
-            sysinfo::RefreshKind::new()
-                .with_components()
-                .with_components_list()
-                .with_cpu()
-                .with_memory()
-                .with_networks()
-                .with_networks_list(),
-        );
-        let last_tick = Instant::now();
-        Self { sysinfo, last_tick }
+        Self {
+            last_tick: Instant::now(),
+            system: sysinfo::System::new(),
+            networks: sysinfo::Networks::new(),
+            components: sysinfo::Components::new(),
+        }
     }
 }
 
@@ -96,7 +91,15 @@ impl super::Producer for System {
 
     async fn produce(&mut self) -> Arc<Self::Output> {
         tokio::time::sleep(Duration::from_secs(1)).await;
-        self.sysinfo.refresh_all();
+
+        self.system.refresh_specifics(
+            sysinfo::RefreshKind::nothing()
+                .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
+                .with_memory(MemoryRefreshKind::nothing().with_ram()),
+        );
+        self.networks.refresh(true);
+        self.components.refresh(true);
+
         Arc::new(self.get())
     }
 }
