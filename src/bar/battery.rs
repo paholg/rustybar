@@ -44,7 +44,7 @@ impl Battery {
 }
 
 impl crate::bar::Bar for Battery {
-    type Data = (f32, battery::State);
+    type Data = (f32, starship_battery::State);
 
     fn width(&self) -> u32 {
         self.bar_width + self.space + self.char_width + self.padding
@@ -57,12 +57,11 @@ impl crate::bar::Bar for Battery {
         let space = crate::util::draw::space(self.space);
 
         let (ch, color) = match state {
-            battery::State::Unknown => ('*', self.colors.unknown),
-            battery::State::Charging => ('+', self.colors.charge),
-            battery::State::Discharging => ('-', self.colors.discharge),
-            battery::State::Empty => ('!', self.colors.unknown),
-            battery::State::Full => (' ', self.colors.charge),
-            battery::State::__Nonexhaustive => ('*', self.colors.unknown),
+            starship_battery::State::Unknown => ('*', self.colors.unknown),
+            starship_battery::State::Charging => ('+', self.colors.charge),
+            starship_battery::State::Discharging => ('-', self.colors.discharge),
+            starship_battery::State::Empty => ('!', self.colors.unknown),
+            starship_battery::State::Full => (' ', self.colors.charge),
         };
 
         format!("{}{}^fg({}){}", bar, space, color, ch)

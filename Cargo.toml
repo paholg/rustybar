@@ -5,12 +5,12 @@ authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 edition = "2021"
 
 [dependencies]
-async-trait = "0.1.86"
-battery     = "0.7.8"
-chrono      = "0.4.39"
-directories = "6.0.0"
-inotify     = "0.11.0"
-lazy_static = "1.5.0"
-regex       = "1.11.1"
-sysinfo     = "0.33.1"
-tokio       = { version = "1.43.0", features = ["full"] }
+async-trait      = "0.1.86"
+chrono           = "0.4.39"
+directories      = "6.0.0"
+inotify          = "0.11.0"
+lazy_static      = "1.5.0"
+regex            = "1.11.1"
+starship-battery = "0.10.0"
+sysinfo          = "0.33.1"
+tokio            = { version = "1.43.0", features = ["full"] }

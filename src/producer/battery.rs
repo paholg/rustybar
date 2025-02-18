@@ -1,4 +1,4 @@
-pub use battery::State;
+pub use starship_battery::State;
 
 use std::{sync::Arc, time::Duration};
 
@@ -12,7 +12,7 @@ impl Battery {
 
     fn get_inner(&self) -> Option<(f32, State)> {
         // TODO: don't construct manager every read.
-        let manager = battery::Manager::new().unwrap();
+        let manager = starship_battery::Manager::new().unwrap();
         let battery = manager.batteries().ok()?.next()?.ok()?;
         Some((battery.state_of_charge().value, battery.state()))
     }
@@ -26,7 +26,7 @@ impl Default for Battery {
 
 #[async_trait::async_trait]
 impl super::Producer for Battery {
-    type Output = (f32, battery::State);
+    type Output = (f32, starship_battery::State);
 
     fn initial_value(&mut self) -> Arc<Self::Output> {
         Arc::new(self.get())
