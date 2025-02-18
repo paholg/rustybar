@@ -1,16 +1,16 @@
 [package]
-name = "rustybar"
+name    = "rustybar"
 version = "0.2.0"
 authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-trait = "0.1.48"
-battery = "0.7.8"
-chrono = "0.4.19"
+battery     = "0.7.8"
+chrono      = "0.4.19"
 directories = "3.0.1"
-inotify = "0.9.2"
+inotify     = "0.9.2"
 lazy_static = "1.4.0"
-regex = "1.4.5"
-sysinfo = "0.16.5"
-tokio = { version = "1.4.0", features = ["full"] }
+regex       = "1.4.5"
+sysinfo     = "0.16.5"
+tokio       = { version = "1.4.0", features = ["full"] }
