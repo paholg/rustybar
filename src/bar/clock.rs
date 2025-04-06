@@ -1,5 +1,6 @@
-use chrono::{DateTime, Local};
 use std::sync::Arc;
+
+use jiff::Zoned;
 
 use crate::{producer::SingleQueue, Color};
 
@@ -29,14 +30,14 @@ impl Clock {
 }
 
 impl crate::bar::Bar for Clock {
-    type Data = DateTime<Local>;
+    type Data = Zoned;
 
     fn width(&self) -> u32 {
         self.width
     }
 
     fn render(&self, data: &Self::Data) -> String {
-        let text = data.format(&self.format);
+        let text = data.strftime(&self.format);
         format!("^fg({}){}", self.color, text)
     }
 

@@ -3,14 +3,13 @@ mod clock;
 mod stdin;
 mod system;
 
+use jiff::Zoned;
 pub use system::SystemInfo;
 
-use chrono::{DateTime, Local};
 use std::sync::{Arc, LazyLock};
 use tokio::sync::{Notify, RwLock};
 
-pub static CLOCK: LazyLock<SingleQueue<Arc<DateTime<Local>>>> =
-    LazyLock::new(|| clock::Clock::spawn());
+pub static CLOCK: LazyLock<SingleQueue<Arc<Zoned>>> = LazyLock::new(|| clock::Clock::spawn());
 pub static STDIN: LazyLock<SingleQueue<Arc<String>>> = LazyLock::new(|| stdin::Stdin::spawn());
 pub static SYSTEM: LazyLock<SingleQueue<Arc<SystemInfo>>> =
     LazyLock::new(|| system::System::spawn());

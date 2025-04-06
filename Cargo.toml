@@ -5,9 +5,9 @@ authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 edition = "2021"
 
 [dependencies]
-chrono           = "0.4.40"
 directories      = "6.0.0"
 inotify          = "0.11.0"
+jiff             = "0.2.5"
 regex            = "1.11.1"
 starship-battery = "0.10.1"
 sysinfo          = "0.34.2"
