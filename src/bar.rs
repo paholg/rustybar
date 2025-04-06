@@ -125,7 +125,7 @@ where
     }
 
     fn spawn(mut self) -> JoinHandle<()> {
-        tokio::spawn(async move {
+        tokio::task::spawn_local(async move {
             let params = self.init_rx.take().unwrap().await.unwrap();
             self.child = start_dzen(&params);
             let data = self.data_queue.read_now().await;

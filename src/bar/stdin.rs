@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
 use crate::producer::SingleQueue;
 
 /// A statusbar for stdin.
@@ -16,7 +14,6 @@ impl Stdin {
     }
 }
 
-#[async_trait]
 impl crate::bar::Bar for Stdin {
     type Data = String;
 

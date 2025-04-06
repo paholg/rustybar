@@ -13,7 +13,6 @@ impl Default for Stdin {
     }
 }
 
-#[async_trait::async_trait]
 impl super::Producer for Stdin {
     type Output = String;
 

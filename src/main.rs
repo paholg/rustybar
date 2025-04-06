@@ -7,6 +7,11 @@ use std::time::Duration;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let local = tokio::task::LocalSet::new();
+    local.run_until(async_main()).await;
+}
+
+async fn async_main() {
     let mut screens = Vec::new();
     let mut bars;
 

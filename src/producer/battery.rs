@@ -24,7 +24,6 @@ impl Default for Battery {
     }
 }
 
-#[async_trait::async_trait]
 impl super::Producer for Battery {
     type Output = (f32, starship_battery::State);
 

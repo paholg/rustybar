@@ -5,7 +5,6 @@ mod system;
 
 pub use system::SystemInfo;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Local};
 use lazy_static::lazy_static;
 use std::sync::Arc;
@@ -18,7 +17,7 @@ lazy_static! {
     pub static ref BATTERY: SingleQueue<Arc<(f32, battery::State)>> = battery::Battery::spawn();
 }
 
-#[async_trait]
+#[allow(async_fn_in_trait)]
 pub trait Producer: Default + Send + Sync + 'static {
     type Output: Send + Sync + 'static;
     async fn produce(&mut self) -> Arc<Self::Output>;
@@ -30,7 +29,7 @@ pub trait Producer: Default + Send + Sync + 'static {
         let queue = SingleQueue::new(initial_value);
         let queue_clone = queue.clone();
 
-        tokio::spawn(async move {
+        tokio::task::spawn_local(async move {
             loop {
                 let data = producer.produce().await;
                 queue.write(data).await;

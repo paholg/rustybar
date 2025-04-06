@@ -5,7 +5,6 @@ authors = ["Paho Lurie-Gregg <paho@paholg.com>"]
 edition = "2021"
 
 [dependencies]
-async-trait      = "0.1.88"
 chrono           = "0.4.40"
 directories      = "6.0.0"
 inotify          = "0.11.0"

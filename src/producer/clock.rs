@@ -4,7 +4,6 @@ use std::{sync::Arc, time::Duration};
 #[derive(Default)]
 pub struct Clock;
 
-#[async_trait::async_trait]
 impl super::Producer for Clock {
     type Output = DateTime<Local>;
 

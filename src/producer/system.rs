@@ -81,7 +81,6 @@ pub struct SystemInfo {
     pub available_memory: u64,
 }
 
-#[async_trait::async_trait]
 impl super::Producer for System {
     type Output = SystemInfo;
 
