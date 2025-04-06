@@ -6,16 +6,16 @@ mod system;
 pub use system::SystemInfo;
 
 use chrono::{DateTime, Local};
-use lazy_static::lazy_static;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tokio::sync::{Notify, RwLock};
 
-lazy_static! {
-    pub static ref CLOCK: SingleQueue<Arc<DateTime<Local>>> = clock::Clock::spawn();
-    pub static ref STDIN: SingleQueue<Arc<String>> = stdin::Stdin::spawn();
-    pub static ref SYSTEM: SingleQueue<Arc<SystemInfo>> = system::System::spawn();
-    pub static ref BATTERY: SingleQueue<Arc<(f32, battery::State)>> = battery::Battery::spawn();
-}
+pub static CLOCK: LazyLock<SingleQueue<Arc<DateTime<Local>>>> =
+    LazyLock::new(|| clock::Clock::spawn());
+pub static STDIN: LazyLock<SingleQueue<Arc<String>>> = LazyLock::new(|| stdin::Stdin::spawn());
+pub static SYSTEM: LazyLock<SingleQueue<Arc<SystemInfo>>> =
+    LazyLock::new(|| system::System::spawn());
+pub static BATTERY: LazyLock<SingleQueue<Arc<(f32, battery::State)>>> =
+    LazyLock::new(|| battery::Battery::spawn());
 
 #[allow(async_fn_in_trait)]
 pub trait Producer: Default + Send + Sync + 'static {

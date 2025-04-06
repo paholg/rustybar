@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use crate::{Color, Font};
 use tokio::sync;
 
@@ -18,9 +20,7 @@ impl Config {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref CONFIG: sync::RwLock<Config> = sync::RwLock::new(Config::new());
-}
+static CONFIG: LazyLock<sync::RwLock<Config>> = LazyLock::new(|| sync::RwLock::new(Config::new()));
 
 pub async fn get() -> Config {
     CONFIG.read().await.clone()
