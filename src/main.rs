@@ -1,127 +1,129 @@
-use rustybar::{
-    bar::{self, Bar},
-    util::screen::get_screens,
-    RustyBar,
-};
-use std::time::Duration;
+use iced::futures::Stream;
+use iced::widget::{row, text};
+use iced::{stream, Element, Font, Pixels, Subscription, Task, Theme};
+use iced_layershell::reexport::Anchor;
+use iced_layershell::settings::{LayerShellSettings, Settings};
+use iced_layershell::to_layer_message;
+use iced_layershell::Application;
+use jiff::Zoned;
+use serde::{Deserialize, Deserializer};
+use tokio::time::sleep;
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
-    let local = tokio::task::LocalSet::new();
-    local.run_until(async_main()).await;
+#[derive(Deserialize)]
+#[serde(default)]
+struct RustybarSettings {
+    height: u32,
+    #[serde(deserialize_with = "de_pixels")]
+    font_size: Pixels,
 }
 
-async fn async_main() {
-    let mut screens = Vec::new();
-    let mut bars;
+fn de_pixels<'de, D>(deserializer: D) -> Result<Pixels, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = f32::deserialize(deserializer)?;
+    Ok(Pixels(value))
+}
 
-    loop {
-        let new_screens = get_screens();
-        if new_screens != screens {
-            screens = new_screens;
-            bars = Vec::new();
-            for screen in &screens {
-                let mut bar = init_bar().await;
-                bar.start(screen).await;
-                bars.push(bar);
-            }
+impl Default for RustybarSettings {
+    fn default() -> Self {
+        Self {
+            height: 32,
+            font_size: Pixels(15.0),
         }
-        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
 
-async fn init_bar() -> RustyBar {
-    let font = rustybar::Font::new("Monospace-12".into(), 12);
-    let height = 24;
-    let ch = font.width;
+fn main() -> eyre::Result<()> {
+    color_eyre::install()?;
 
-    // Spacemacs dark colors
-    let bg1 = "#292b2e".into();
-    let bg2 = "#1f2022".into();
-    let bg4 = "#0a0814".into();
-    let aqua = "#2d9574".into();
-    let blue = "#4f97d7".into();
-    let magenta = "#a31db1".into();
-    let red = "#f2241f".into();
+    let s = RustybarSettings::default();
 
-    {
-        // TODO: Move all this to methods
-        let mut config = rustybar::config::write().await;
-        config.font = font;
-        config.height = height;
-        config.background = bg4;
+    Rustybar::run(Settings {
+        id: Some("rustybar".into()),
+        antialiasing: true,
+        default_font: Font::MONOSPACE,
+        default_text_size: s.font_size,
+        layer_settings: LayerShellSettings {
+            size: Some((0, s.height)),
+            exclusive_zone: s.height.try_into()?,
+            anchor: Anchor::Top | Anchor::Left | Anchor::Right,
+            ..Default::default()
+        },
+        ..Default::default()
+    })?;
+
+    Ok(())
+}
+
+struct Rustybar {
+    time: Zoned,
+}
+
+#[to_layer_message]
+#[derive(Debug, Clone)]
+enum Message {
+    Time(Zoned),
+}
+
+impl Application for Rustybar {
+    type Message = Message;
+    type Flags = ();
+    type Theme = Theme;
+    type Executor = iced::executor::Default;
+
+    fn new(_flags: ()) -> (Self, Task<Message>) {
+        (Self { time: Zoned::now() }, Task::none())
     }
 
-    rustybar::RustyBar::new(
-        vec![bar::Stdin::new(100).await.start()],
-        vec![
-            bar::Temp::new(
-                [(40.0, aqua), (60.0, blue), (80.0, magenta), (100.0, red)]
-                    .iter()
-                    .collect(),
-                ch * 2,
-            )
-            .await
-            .start(),
-            bar::Cpu::new(
-                [
-                    (0.0, bg2),
-                    (0.2, bg1),
-                    (0.4, aqua),
-                    (0.8, magenta),
-                    (1.0, red),
-                ]
-                .iter()
-                .collect(),
-                40,
-                80,
-                16,
-                ch,
-                ch * 2,
-            )
-            .await
-            .start(),
-            bar::Memory::new([(1e9, red), (3e9, blue), (8e9, aqua)].iter().collect(), 0)
-                .await
-                .start(),
-        ],
-        vec![
-            bar::Network::new(
-                [
-                    (0.0, bg2),
-                    (1e3, bg1),
-                    (10e3, aqua),
-                    (100e3, blue),
-                    (1e6, magenta),
-                    (50e6, red),
-                ]
-                .iter()
-                .collect(),
-                4 * ch,
-            )
-            .await
-            .start(),
-            bar::Battery::new(
-                [(0.0, red), (0.3, magenta), (0.7, blue), (1.0, aqua)]
-                    .iter()
-                    .collect(),
-                bar::BatteryColors {
-                    charge: aqua,
-                    discharge: red,
-                    unknown: magenta,
-                },
-                40,
-                16,
-                ch,
-                ch,
-                ch * 2,
-            )
-            .await
-            .start(),
-            bar::Clock::new(blue, "%a %Y-%m-%d", 14, 2 * ch)
-                .await
-                .start(),
-            bar::Clock::new(aqua, "%H:%M:%S", 8, ch).await.start(),
-        ],
-    )
+    fn namespace(&self) -> String {
+        String::from("rustybar")
+    }
+
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::Time(time) => {
+                self.time = time;
+                Task::none()
+            }
+            // These are the variants created by to_layer_message
+            Message::AnchorChange(..)
+            | Message::SetInputRegion(..)
+            | Message::AnchorSizeChange(..)
+            | Message::LayerChange(..)
+            | Message::MarginChange(..)
+            | Message::SizeChange(..)
+            | Message::VirtualKeyboardPressed { .. } => unreachable!(),
+        }
+    }
+
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
+    }
+
+    fn view(&self) -> Element<Message> {
+        let date = self.time.strftime("%a %Y-%m-%d");
+        let time = self.time.strftime("%H:%M:%S");
+        row![
+            text("hello"),
+            text(date.to_string()),
+            text(time.to_string())
+        ]
+        .spacing(20)
+        .into()
+    }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        Subscription::run(worker)
+    }
+}
+
+fn worker() -> impl Stream<Item = Message> {
+    stream::channel(100, |mut output| async move {
+        loop {
+            let now = Zoned::now();
+            output.try_send(Message::Time(now)).unwrap();
+            sleep(std::time::Duration::from_secs(1)).await;
+        }
+    })
 }
