@@ -1,108 +1,52 @@
-use bar::{BarData, BarParams};
-pub use util::bytes::format_bytes;
-pub use util::color::{Color, ColorMap};
-use util::screen::Screen;
+use consumer::{
+    clock::{ClockConfig, ClockConsumer},
+    cpu::{CpuConfig, CpuConsumer},
+    Consumer, RegisterConsumer,
+};
+use enum_dispatch::enum_dispatch;
+use futures::Stream;
+use iced::Element;
+use iced_layershell::to_layer_message;
+use producer::{
+    tick::{TickMessage, TickProducer},
+    Producer, ProducerMap,
+};
+use serde::Deserialize;
+use strum::EnumDiscriminants;
 
-pub mod bar;
 pub mod config;
+pub mod consumer;
 pub mod producer;
 pub mod util;
 
-/// A convenience macro for creating a static Regex, for repeated use at only one call-site.  Copied
-/// from https://github.com/Canop/lazy-regex
-#[macro_export]
-macro_rules! regex {
-    ($s: literal) => {{
-        use std::sync::LazyLock;
-        static RE: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new($s).unwrap());
-        &*RE
-    }};
+#[enum_dispatch]
+#[derive(EnumDiscriminants)]
+#[strum_discriminants(derive(Hash))]
+pub enum ProducerEnum {
+    TickProducer,
 }
 
-#[derive(Clone, Debug)]
-pub struct Font {
-    pub name: String,
-    pub width: u32,
+#[enum_dispatch]
+#[derive(Deserialize)]
+pub enum ConsumerConfig {
+    ClockConfig,
+    CpuConfig,
 }
 
-impl Font {
-    pub const fn new(name: String, width: u32) -> Font {
-        Font { name, width }
-    }
+#[enum_dispatch]
+pub enum ConsumerEnum {
+    ClockConsumer,
+    CpuConsumer,
 }
 
-pub struct RustyBar {
-    pub left: Vec<BarData>,
-    pub center: Vec<BarData>,
-    pub right: Vec<BarData>,
+#[to_layer_message]
+#[derive(Debug)]
+pub enum Message {
+    Tick(TickMessage),
 }
 
-impl RustyBar {
-    pub fn new(left: Vec<BarData>, center: Vec<BarData>, right: Vec<BarData>) -> RustyBar {
-        RustyBar {
-            left,
-            center,
-            right,
-        }
-    }
-
-    pub async fn start(&mut self, screen: &Screen) {
-        let config = config::get().await;
-        let mut x = screen.x;
-
-        let center_width: u32 = self.center.iter().map(|b| b.width()).sum();
-        let right_width: u32 = self.right.iter().map(|b| b.width()).sum();
-        let center_x = (screen.width - center_width) / 2 + screen.x;
-
-        let last_idx = self.left.len() - 1;
-        for (i, bar) in self.left.iter_mut().enumerate() {
-            let pad = if i == last_idx {
-                center_x - x - bar.width()
-            } else {
-                0
-            };
-            let params = BarParams {
-                x,
-                y: screen.y,
-                w: bar.width() + pad,
-                font: config.font.name.clone(),
-                bg: config.background,
-                h: config.height,
-            };
-            bar.init(params).await;
-            x += bar.width() + pad;
-        }
-
-        let last_idx = self.center.len() - 1;
-        for (i, bar) in self.center.iter_mut().enumerate() {
-            let pad = if i == last_idx {
-                screen.x + screen.width - x - right_width - bar.width()
-            } else {
-                0
-            };
-            let params = BarParams {
-                x,
-                y: screen.y,
-                w: bar.width() + pad,
-                font: config.font.name.clone(),
-                bg: config.background,
-                h: config.height,
-            };
-            bar.init(params).await;
-            x += bar.width() + pad;
-        }
-
-        for bar in &mut self.right {
-            let params = BarParams {
-                x,
-                y: screen.y,
-                w: bar.width(),
-                font: config.font.name.clone(),
-                bg: config.background,
-                h: config.height,
-            };
-            bar.init(params).await;
-            x += bar.width();
-        }
+impl Default for ProducerEnum {
+    fn default() -> Self {
+        todo!()
     }
 }
