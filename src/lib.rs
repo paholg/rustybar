@@ -2,6 +2,7 @@ use consumer::{
     clock::{ClockConfig, ClockConsumer},
     cpu::{CpuConfig, CpuConsumer},
     memory::{MemoryConfig, MemoryConsumer},
+    network::{NetworkConfig, NetworkConsumer},
     temp::{TempConfig, TempConsumer},
     Consumer, RegisterConsumer,
 };
@@ -34,6 +35,7 @@ pub enum ConsumerConfig {
     ClockConfig,
     CpuConfig,
     MemoryConfig,
+    NetworkConfig,
     TempConfig,
 }
 
@@ -42,6 +44,7 @@ pub enum ConsumerEnum {
     ClockConsumer,
     CpuConsumer,
     MemoryConsumer,
+    NetworkConsumer,
     TempConsumer,
 }
 

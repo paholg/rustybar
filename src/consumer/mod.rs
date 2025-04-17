@@ -6,6 +6,7 @@ use crate::{producer::ProducerMap, ConsumerEnum, Message};
 pub mod clock;
 pub mod cpu;
 pub mod memory;
+pub mod network;
 pub mod temp;
 
 #[enum_dispatch(ConsumerEnum)]

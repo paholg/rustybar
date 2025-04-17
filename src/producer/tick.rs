@@ -15,7 +15,7 @@ pub struct Battery {
     pub state: State,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Network {
     pub bytes_received: u64,
     pub bytes_transmitted: u64,

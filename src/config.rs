@@ -2,7 +2,10 @@ use iced::Color;
 use serde::{Deserialize, Deserializer};
 
 use crate::{
-    consumer::{clock::ClockConfig, cpu::CpuConfig, memory::MemoryConfig, temp::TempConfig},
+    consumer::{
+        clock::ClockConfig, cpu::CpuConfig, memory::MemoryConfig, network::NetworkConfig,
+        temp::TempConfig,
+    },
     ConsumerConfig,
 };
 
@@ -77,7 +80,7 @@ impl Default for RustybarConfig {
                 CpuConfig {
                     min_max_width: 40.0,
                     avg_width: 80.0,
-                    spacing: 8.0,
+                    spacing: 10.0,
                     height: 18.0,
                     colormap: [
                         (0.0, bg2),
@@ -96,6 +99,20 @@ impl Default for RustybarConfig {
                 .into(),
             ],
             right: vec![
+                NetworkConfig {
+                    colormap: [
+                        (0.0, bg2),
+                        (1e3, bg1),
+                        (10e3, aqua),
+                        (100e3, blue),
+                        (1e6, magenta),
+                        (50e6, red),
+                    ]
+                    .iter()
+                    .collect(),
+                    spacing: 12.0,
+                }
+                .into(),
                 ClockConfig {
                     format: "%a %Y-%m-%d".into(),
                     color: Color::parse("#4f97d7").unwrap(),
