@@ -1,8 +1,8 @@
-use iced::{Color, Pixels};
+use iced::Color;
 use serde::{Deserialize, Deserializer};
 
 use crate::{
-    consumer::{clock::ClockConfig, cpu::CpuConfig},
+    consumer::{clock::ClockConfig, cpu::CpuConfig, memory::MemoryConfig, temp::TempConfig},
     ConsumerConfig,
 };
 
@@ -52,26 +52,49 @@ impl Default for RustybarConfig {
             global: GlobalConfig {
                 height: 24,
                 background: Color::parse("#000000").unwrap(),
-                font_size: 18.0,
+                font_size: 16.0,
                 spacing: 12.0,
             },
-            left: vec![],
-            center: vec![CpuConfig {
-                min_max_width: 40.0,
-                avg_width: 80.0,
-                spacing: 8.0,
-                height: 16.0,
-                colormap: [
-                    (0.0, bg2),
-                    (0.2, bg1),
-                    (0.4, aqua),
-                    (0.8, magenta),
-                    (1.0, red),
-                ]
-                .iter()
-                .collect(),
-            }
-            .into()],
+            left: vec![
+                ClockConfig {
+                    format: "%a %Y-%m-%d".into(),
+                    color: Color::parse("#4f97d7").unwrap(),
+                }
+                .into(),
+                ClockConfig {
+                    format: "%H:%M:%S".into(),
+                    color: Color::parse("#2d9574").unwrap(),
+                }
+                .into(),
+            ],
+            center: vec![
+                TempConfig {
+                    colormap: [(40.0, aqua), (60.0, blue), (80.0, magenta), (100.0, red)]
+                        .iter()
+                        .collect(),
+                }
+                .into(),
+                CpuConfig {
+                    min_max_width: 40.0,
+                    avg_width: 80.0,
+                    spacing: 8.0,
+                    height: 18.0,
+                    colormap: [
+                        (0.0, bg2),
+                        (0.2, bg1),
+                        (0.4, aqua),
+                        (0.8, magenta),
+                        (1.0, red),
+                    ]
+                    .iter()
+                    .collect(),
+                }
+                .into(),
+                MemoryConfig {
+                    colormap: [(1e9, red), (3e9, blue), (8e9, aqua)].iter().collect(),
+                }
+                .into(),
+            ],
             right: vec![
                 ClockConfig {
                     format: "%a %Y-%m-%d".into(),

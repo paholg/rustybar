@@ -1,4 +1,6 @@
 use iced::{
+    alignment::Vertical,
+    border::Radius,
     widget::{row, ProgressBar},
     Element, Length, Theme,
 };
@@ -49,9 +51,9 @@ impl CpuConsumer {
             .style(move |theme: &Theme| iced::widget::progress_bar::Style {
                 bar: color.into(),
                 border: iced::Border {
-                    color: color,
+                    color,
                     width: 1.0,
-                    ..Default::default()
+                    radius: Radius::new(0.0),
                 },
                 background: theme.palette().background.into(),
             })
@@ -71,7 +73,8 @@ impl Consumer for CpuConsumer {
             self.bar(self.cpu.avg, self.config.avg_width),
             self.bar(self.cpu.max, self.config.min_max_width),
         ]
-        .spacing(self.config.spacing as f32)
+        .align_y(Vertical::Center)
+        .spacing(self.config.spacing)
         .into()
     }
 }

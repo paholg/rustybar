@@ -28,11 +28,12 @@ pub struct Cpu {
     pub max: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Temperature {
     pub max: f32,
 }
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Default, Clone)]
 pub struct Memory {
     pub available: u64,
 }

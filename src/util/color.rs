@@ -13,7 +13,7 @@ pub struct Colormap {
 }
 
 impl<'de> Deserialize<'de> for Colormap {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -56,7 +56,7 @@ impl Colormap {
         let lower: f32 = (self.values[i] - val) / (self.values[i] - self.values[i - 1]);
         let upper: f32 = (val - self.values[i - 1]) / (self.values[i] - self.values[i - 1]);
 
-        let interpolate = |c1, c2| (lower * (f32::from(c1)) + upper * f32::from(c2));
+        let interpolate = |c1, c2| (lower * (c1) + upper * c2);
         let red = interpolate(self.colors[i - 1].r, self.colors[i].r);
         let green = interpolate(self.colors[i - 1].g, self.colors[i].g);
         let blue = interpolate(self.colors[i - 1].b, self.colors[i].b);

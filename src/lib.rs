@@ -1,6 +1,8 @@
 use consumer::{
     clock::{ClockConfig, ClockConsumer},
     cpu::{CpuConfig, CpuConsumer},
+    memory::{MemoryConfig, MemoryConsumer},
+    temp::{TempConfig, TempConsumer},
     Consumer, RegisterConsumer,
 };
 use enum_dispatch::enum_dispatch;
@@ -31,12 +33,16 @@ pub enum ProducerEnum {
 pub enum ConsumerConfig {
     ClockConfig,
     CpuConfig,
+    MemoryConfig,
+    TempConfig,
 }
 
 #[enum_dispatch]
 pub enum ConsumerEnum {
     ClockConsumer,
     CpuConsumer,
+    MemoryConsumer,
+    TempConsumer,
 }
 
 #[to_layer_message]
