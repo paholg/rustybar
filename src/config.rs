@@ -3,7 +3,11 @@ use serde::{Deserialize, Deserializer};
 
 use crate::{
     consumer::{
-        clock::ClockConfig, cpu::CpuConfig, memory::MemoryConfig, network::NetworkConfig,
+        battery::{self, BatteryColors, BatteryConfig},
+        clock::ClockConfig,
+        cpu::CpuConfig,
+        memory::MemoryConfig,
+        network::NetworkConfig,
         temp::TempConfig,
     },
     ConsumerConfig,
@@ -116,6 +120,20 @@ impl Default for RustybarConfig {
                 ClockConfig {
                     format: "%a %Y-%m-%d".into(),
                     color: Color::parse("#4f97d7").unwrap(),
+                }
+                .into(),
+                BatteryConfig {
+                    width: 40.0,
+                    height: 18.0,
+                    spacing: 10.0,
+                    colors: BatteryColors {
+                        charge: aqua,
+                        discharge: red,
+                        unknown: magenta,
+                    },
+                    colormap: [(0.0, red), (0.3, magenta), (0.7, blue), (1.0, aqua)]
+                        .iter()
+                        .collect(),
                 }
                 .into(),
                 ClockConfig {

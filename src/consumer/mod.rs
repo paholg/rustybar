@@ -3,6 +3,7 @@ use iced::Element;
 
 use crate::{producer::ProducerMap, ConsumerEnum, Message};
 
+pub mod battery;
 pub mod clock;
 pub mod cpu;
 pub mod memory;

@@ -1,4 +1,5 @@
 use consumer::{
+    battery::{BatteryConfig, BatteryConsumer},
     clock::{ClockConfig, ClockConsumer},
     cpu::{CpuConfig, CpuConsumer},
     memory::{MemoryConfig, MemoryConsumer},
@@ -32,6 +33,7 @@ pub enum ProducerEnum {
 #[enum_dispatch]
 #[derive(Deserialize)]
 pub enum ConsumerConfig {
+    BatteryConfig,
     ClockConfig,
     CpuConfig,
     MemoryConfig,
@@ -41,6 +43,7 @@ pub enum ConsumerConfig {
 
 #[enum_dispatch]
 pub enum ConsumerEnum {
+    BatteryConsumer,
     ClockConsumer,
     CpuConsumer,
     MemoryConsumer,
