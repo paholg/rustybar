@@ -86,7 +86,13 @@ impl TickProducer {
         let (bytes_received, bytes_transmitted) = self
             .networks
             .iter()
-            .map(|(_name, network)| (network.received(), network.transmitted()))
+            .filter_map(|(name, network)| {
+                if name.starts_with("lo") {
+                    None
+                } else {
+                    Some((network.received(), network.transmitted()))
+                }
+            })
             .fold((0, 0), |sum, (r, t)| (sum.0 + r, sum.1 + t));
 
         Network {
