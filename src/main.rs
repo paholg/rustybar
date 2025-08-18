@@ -28,6 +28,7 @@ fn main() -> eyre::Result<()> {
             size: Some((0, config.global.height)),
             exclusive_zone: config.global.height.try_into()?,
             anchor: Anchor::Top | Anchor::Left | Anchor::Right,
+            start_mode: iced_layershell::settings::StartMode::TargetScreen("DP-3".into()),
             ..Default::default()
         },
         ..Default::default()
