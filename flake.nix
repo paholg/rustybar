@@ -31,9 +31,12 @@
           vulkan-loader
         ];
 
+        cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+
         package = pkgs.rustPlatform.buildRustPackage {
-          pname = "rustybar";
-          version = "0.2.0";
+          pname = cargoToml.package.name;
+          version = cargoToml.package.version;
+          meta.mainProgram = cargoToml.package.name;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
         };
