@@ -1,10 +1,13 @@
+run:
+    direnv exec / nix run .
+
 # Generate code and run lints and tests
 test-local: lint test
 
-# Update lockfiles
+# Update dependencies
 up:
     nix flake update
-    cargo update
+    cargo upgrade -i
 
 # Run all lints
 lint: fmt-check clippy clippy-all

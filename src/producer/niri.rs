@@ -30,11 +30,9 @@ fn produce(state: &EventStreamState) -> Message {
 
         if let Some(id) = ws.active_window_id
             && ws.is_active
-        {
-            if let Some(window) = state.windows.windows.get(&id) {
+            && let Some(window) = state.windows.windows.get(&id) {
                 output.window = window.title.clone().unwrap_or_default();
             }
-        }
 
         output.workspaces.push(ws.clone());
     }

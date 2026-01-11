@@ -26,9 +26,8 @@
         };
 
         buildInputs = with pkgs; [
-          wayland
           libxkbcommon
-          vulkan-loader
+          wayland
         ];
 
         cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
@@ -39,6 +38,10 @@
           meta.mainProgram = cargoToml.package.name;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+
+          postFixup = ''
+            patchelf --add-rpath ${pkgs.lib.makeLibraryPath buildInputs} $out/bin/${cargoToml.package.name}
+          '';
         };
       in
       {
