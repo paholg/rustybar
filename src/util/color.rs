@@ -72,10 +72,10 @@ impl Colormap {
         let alpha = interpolate(self.colors[i - 1].a, self.colors[i].a);
 
         Color {
-            r: red,
-            g: green,
-            b: blue,
-            a: alpha,
+            r: red.clamp(0.0, 1.0),
+            g: green.clamp(0.0, 1.0),
+            b: blue.clamp(0.0, 1.0),
+            a: alpha.clamp(0.0, 1.0),
         }
     }
 }
