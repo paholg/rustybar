@@ -3,7 +3,6 @@
     nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    crane.url = "github:ipetkov/crane";
   };
 
   outputs =
@@ -11,27 +10,20 @@
       nixpkgs,
       flake-utils,
       rust-overlay,
-      crane,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        overlays = [
-          (import rust-overlay)
-        ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs { inherit system overlays; };
 
-        rust = pkgs.rust-bin.stable.latest.default.override {
+        rustDev = pkgs.rust-bin.stable.latest.default.override {
           extensions = [
             "rust-analyzer"
             "rust-src"
           ];
         };
-
-        craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
 
         buildInputs = with pkgs; [
           wayland
@@ -39,25 +31,20 @@
           vulkan-loader
         ];
 
-        crate = craneLib.buildPackage {
-          inherit buildInputs;
-          src = craneLib.cleanCargoSource ./.;
-          strictDeps = true;
+        package = pkgs.rustPlatform.buildRustPackage {
+          pname = "rustybar";
+          version = "0.2.0";
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
         };
       in
       {
-        checks = {
-          inherit crate;
-        };
-        packages = {
-          default = crate;
-          inherit crate;
-        };
+        packages.default = package;
         devShells.default = pkgs.mkShell {
           inherit buildInputs;
           packages = [
             pkgs.just
-            rust
+            rustDev
           ];
 
           env = {
