@@ -1,47 +1,46 @@
-use iced::{widget::text, Element};
-use serde::Deserialize;
+use async_trait::async_trait;
+use iced::{Element, widget::text};
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::{
-    producer::{
-        tick::{Temperature, TickProducer},
-        ProducerMap,
-    },
+    consumer::{Config, IcedMessage},
+    producer::tick::{self},
     util::color::Colormap,
-    ConsumerEnum, Message, ProducerEnum,
 };
 
-use super::{Consumer, RegisterConsumer};
+use super::Consumer;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct TempConfig {
     pub colormap: Colormap,
 }
 
-impl RegisterConsumer for TempConfig {
-    fn register(self, producers: &mut ProducerMap) -> ConsumerEnum {
-        producers.register(ProducerEnum::TickProducer(TickProducer::default()));
-        TempConsumer {
-            config: self,
-            temp: Temperature::default(),
-        }
-        .into()
+#[typetag::serde]
+impl Config for TempConfig {
+    fn into_consumer(self: Box<Self>) -> Box<dyn Consumer> {
+        let receiver = tick::listen();
+
+        Box::new(TempConsumer {
+            receiver,
+            config: *self,
+        })
     }
 }
 
 pub struct TempConsumer {
+    receiver: watch::Receiver<tick::Message>,
     config: TempConfig,
-    temp: Temperature,
 }
 
+#[async_trait]
 impl Consumer for TempConsumer {
-    fn handle(&mut self, message: &Message) {
-        if let Message::Tick(msg) = message {
-            self.temp = msg.temp.clone();
-        }
+    async fn consume(&mut self) {
+        self.receiver.changed().await.unwrap();
     }
 
-    fn render(&self) -> Element<Message> {
-        let max = self.temp.max;
+    fn render(&self, _: &str) -> Element<'_, IcedMessage> {
+        let max = self.receiver.borrow().temp.max;
         let t = format!("{max:3.0} °C");
         let color = self.config.colormap.map(max);
         text(t).color(color).into()

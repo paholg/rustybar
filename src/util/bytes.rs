@@ -4,7 +4,7 @@ struct Unit<'a> {
 }
 
 impl Unit<'_> {
-    const fn new(value: f32, name: &str) -> Unit {
+    const fn new(value: f32, name: &str) -> Unit<'_> {
         Unit { value, name }
     }
 }

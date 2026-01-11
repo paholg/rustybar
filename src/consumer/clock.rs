@@ -1,47 +1,47 @@
-use iced::{widget::text, Color, Element};
-use jiff::Zoned;
-use serde::Deserialize;
+use async_trait::async_trait;
+use iced::{Color, Element, widget::text};
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::{
-    config::de_color,
-    producer::{tick::TickProducer, ProducerMap},
-    ConsumerEnum, Message, ProducerEnum,
+    consumer::{Config, IcedMessage},
+    producer::tick,
 };
 
-use super::{Consumer, RegisterConsumer};
+use super::Consumer;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ClockConfig {
     pub format: String,
-    #[serde(deserialize_with = "de_color")]
     pub color: Color,
 }
 
-impl RegisterConsumer for ClockConfig {
-    fn register(self, producers: &mut ProducerMap) -> ConsumerEnum {
-        producers.register(ProducerEnum::TickProducer(TickProducer::default()));
-        ClockConsumer {
-            config: self,
-            time: Zoned::now(),
-        }
-        .into()
+#[typetag::serde]
+impl Config for ClockConfig {
+    fn into_consumer(self: Box<Self>) -> Box<dyn Consumer> {
+        let receiver = tick::listen();
+
+        Box::new(ClockConsumer {
+            receiver,
+            config: *self,
+        })
     }
 }
 
 pub struct ClockConsumer {
+    receiver: watch::Receiver<tick::Message>,
     config: ClockConfig,
-    time: Zoned,
 }
 
+#[async_trait]
 impl Consumer for ClockConsumer {
-    fn handle(&mut self, message: &Message) {
-        if let Message::Tick(msg) = message {
-            self.time = msg.time.clone();
-        }
+    async fn consume(&mut self) {
+        self.receiver.changed().await.unwrap();
     }
 
-    fn render(&self) -> Element<Message> {
-        let now = self.time.strftime(&self.config.format).to_string();
+    fn render(&self, _: &str) -> Element<'_, IcedMessage> {
+        let time = &self.receiver.borrow().time;
+        let now = time.strftime(&self.config.format).to_string();
         text(now).color(self.config.color).into()
     }
 }

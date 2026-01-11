@@ -1,13 +1,12 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
 
 use jiff::Zoned;
 use starship_battery::State;
 use sysinfo::{Components, CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
-use tokio::time::sleep;
-
-use crate::Message;
-
-use super::Producer;
+use tokio::{sync::watch, time::sleep};
 
 #[derive(Debug, Default, Clone)]
 pub struct Battery {
@@ -39,21 +38,41 @@ pub struct Memory {
 }
 
 #[derive(Debug)]
-pub struct TickMessage {
+pub struct Message {
     /// Duration since the last update.
     pub tick_duration: Duration,
     /// The time at the last update.
     pub time: Zoned,
-    pub battery: Battery,
+    pub battery: Option<Battery>,
     pub network: Network,
     pub cpu: Cpu,
     pub temp: Temperature,
     pub memory: Memory,
 }
 
+pub fn listen() -> watch::Receiver<Message> {
+    static SENDER: LazyLock<watch::Sender<Message>> = LazyLock::new(|| {
+        let mut prod = Producer::default();
+        let init = prod.produce();
+        let (sender, _) = watch::channel(init);
+
+        let s = sender.clone();
+
+        tokio::spawn(async move {
+            loop {
+                sleep(std::time::Duration::from_secs(1)).await;
+                sender.send(prod.produce()).unwrap();
+            }
+        });
+        s
+    });
+
+    SENDER.subscribe()
+}
+
 /// This producer currently produces anything that we produce on a 1-second
 /// tick.
-pub struct TickProducer {
+struct Producer {
     last_tick: Instant,
     system: System,
     networks: Networks,
@@ -61,7 +80,7 @@ pub struct TickProducer {
     battery_manager: starship_battery::Manager,
 }
 
-impl Default for TickProducer {
+impl Default for Producer {
     fn default() -> Self {
         Self {
             last_tick: Instant::now(),
@@ -73,9 +92,33 @@ impl Default for TickProducer {
     }
 }
 
-impl TickProducer {
+impl Producer {
+    fn produce(&mut self) -> Message {
+        self.system.refresh_specifics(
+            RefreshKind::nothing()
+                .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
+                .with_memory(MemoryRefreshKind::nothing().with_ram()),
+        );
+        self.networks.refresh(true);
+        self.components.refresh(true);
+
+        let now = Instant::now();
+        let tick_duration = now.duration_since(self.last_tick);
+        self.last_tick = now;
+
+        Message {
+            time: Zoned::now(),
+            tick_duration,
+            battery: self.battery(),
+            network: self.network(),
+            cpu: self.cpu(),
+            temp: self.temp(),
+            memory: self.memory(),
+        }
+    }
+
     fn battery(&self) -> Option<Battery> {
-        let battery = self.battery_manager.batteries().ok()?.next()?.ok()?;
+        let battery = self.battery_manager.batteries().unwrap().next()?.unwrap();
         Some(Battery {
             charge: battery.state_of_charge().value,
             state: battery.state(),
@@ -128,33 +171,5 @@ impl TickProducer {
     fn memory(&self) -> Memory {
         let available = self.system.available_memory();
         Memory { available }
-    }
-}
-
-impl Producer for TickProducer {
-    async fn produce(&mut self) -> Message {
-        sleep(std::time::Duration::from_secs(1)).await;
-
-        self.system.refresh_specifics(
-            RefreshKind::nothing()
-                .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
-                .with_memory(MemoryRefreshKind::nothing().with_ram()),
-        );
-        self.networks.refresh(true);
-        self.components.refresh(true);
-
-        let now = Instant::now();
-        let tick_duration = now.duration_since(self.last_tick);
-        self.last_tick = now;
-
-        Message::Tick(TickMessage {
-            time: Zoned::now(),
-            tick_duration,
-            battery: self.battery().unwrap_or_default(),
-            network: self.network(),
-            cpu: self.cpu(),
-            temp: self.temp(),
-            memory: self.memory(),
-        })
     }
 }

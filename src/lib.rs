@@ -1,64 +1,46 @@
-use consumer::{
-    battery::{BatteryConfig, BatteryConsumer},
-    clock::{ClockConfig, ClockConsumer},
-    cpu::{CpuConfig, CpuConsumer},
-    memory::{MemoryConfig, MemoryConsumer},
-    network::{NetworkConfig, NetworkConsumer},
-    temp::{TempConfig, TempConsumer},
-    Consumer, RegisterConsumer,
+use std::sync::LazyLock;
+
+use crate::{
+    config::{GlobalConfig, RustybarConfig},
+    consumer::Consumer,
 };
-use enum_dispatch::enum_dispatch;
-use futures::Stream;
-use iced::Element;
-use iced_layershell::to_layer_message;
-use producer::{
-    tick::{TickMessage, TickProducer},
-    Producer, ProducerMap,
-};
-use serde::Deserialize;
-use strum::EnumDiscriminants;
 
 pub mod config;
 pub mod consumer;
+pub mod iced_bar;
 pub mod producer;
 pub mod util;
 
-#[enum_dispatch]
-#[derive(EnumDiscriminants)]
-#[strum_discriminants(derive(Hash))]
-pub enum ProducerEnum {
-    TickProducer,
+pub static APP: LazyLock<Rustybar> = LazyLock::new(|| {
+    let config = RustybarConfig::default();
+    build(config)
+});
+
+pub struct Rustybar {
+    config: GlobalConfig,
+
+    left: Vec<Box<dyn Consumer>>,
+    center: Vec<Box<dyn Consumer>>,
+    right: Vec<Box<dyn Consumer>>,
 }
 
-#[enum_dispatch]
-#[derive(Deserialize)]
-pub enum ConsumerConfig {
-    BatteryConfig,
-    ClockConfig,
-    CpuConfig,
-    MemoryConfig,
-    NetworkConfig,
-    TempConfig,
-}
+fn build(config: RustybarConfig) -> Rustybar {
+    let left = config.left.into_iter().map(|c| c.into_consumer()).collect();
+    let center = config
+        .center
+        .into_iter()
+        .map(|c| c.into_consumer())
+        .collect();
+    let right = config
+        .right
+        .into_iter()
+        .map(|c| c.into_consumer())
+        .collect();
 
-#[enum_dispatch]
-pub enum ConsumerEnum {
-    BatteryConsumer,
-    ClockConsumer,
-    CpuConsumer,
-    MemoryConsumer,
-    NetworkConsumer,
-    TempConsumer,
-}
-
-#[to_layer_message]
-#[derive(Debug)]
-pub enum Message {
-    Tick(TickMessage),
-}
-
-impl Default for ProducerEnum {
-    fn default() -> Self {
-        todo!()
+    Rustybar {
+        config: config.global,
+        left,
+        center,
+        right,
     }
 }

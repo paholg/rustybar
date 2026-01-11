@@ -1,39 +1,35 @@
-use std::collections::HashMap;
-
-use enum_dispatch::enum_dispatch;
-use futures::Stream;
-
-use crate::{Message, ProducerEnum, ProducerEnumDiscriminants};
-
+pub mod niri;
 pub mod tick;
 
-#[enum_dispatch(ProducerEnum)]
-#[allow(async_fn_in_trait)]
-pub trait Producer: Default {
-    async fn produce(&mut self) -> Message;
+// pub trait Producer {
+//     fn produce(&mut self) -> BoxFuture<'_, Message>;
 
-    fn produce_stream(self) -> impl Stream<Item = Message> {
-        let mut this = self;
-        async_stream::stream! {
-            loop {
-                yield this.produce().await;
-            }
-        }
-    }
-}
+//     fn produce_stream(self: Box<Self>) -> Pin<Box<dyn Stream<Item = Message> + Send>>
+//     where
+//         Self: Sized + Send + 'static,
+//     {
+//         let mut this = self;
+//         Box::pin(async_stream::stream! {
+//             loop {
+//                 yield this.produce().await;
+//             }
+//         })
+//     }
+// }
 
-#[derive(Default)]
-pub struct ProducerMap {
-    map: HashMap<ProducerEnumDiscriminants, ProducerEnum>,
-}
+// #[derive(Default)]
+// pub struct ProducerMap {
+//     map: HashMap<&'static str, Box<dyn Producer>>,
+// }
 
-impl ProducerMap {
-    pub fn register(&mut self, producer: ProducerEnum) {
-        let key = (&producer).into();
-        self.map.entry(key).or_insert(producer);
-    }
+// impl ProducerMap {
+//     pub fn register(&mut self, producer: impl Producer + 'static) {
+//         self.map
+//             .entry(producer.key())
+//             .or_insert_with(|| broadcast::channel(1));
+//     }
 
-    pub fn into_producers(self) -> Vec<ProducerEnum> {
-        self.map.into_values().collect()
-    }
-}
+//     pub fn into_producers(self) -> Vec<Box<dyn Producer>> {
+//         self.map.into_values().collect()
+//     }
+// }

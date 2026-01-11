@@ -1,47 +1,46 @@
-use iced::{widget::text, Element};
-use serde::Deserialize;
+use async_trait::async_trait;
+use iced::{Element, widget::text};
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::{
-    producer::{
-        tick::{Memory, TickProducer},
-        ProducerMap,
-    },
+    consumer::{Config, IcedMessage},
+    producer::tick::{self},
     util::{bytes::format_bytes, color::Colormap},
-    ConsumerEnum, Message, ProducerEnum,
 };
 
-use super::{Consumer, RegisterConsumer};
+use super::Consumer;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct MemoryConfig {
     pub colormap: Colormap,
 }
 
-impl RegisterConsumer for MemoryConfig {
-    fn register(self, producers: &mut ProducerMap) -> ConsumerEnum {
-        producers.register(ProducerEnum::TickProducer(TickProducer::default()));
-        MemoryConsumer {
-            config: self,
-            mem: Memory::default(),
-        }
-        .into()
+#[typetag::serde]
+impl Config for MemoryConfig {
+    fn into_consumer(self: Box<Self>) -> Box<dyn Consumer> {
+        let receiver = tick::listen();
+
+        Box::new(MemoryConsumer {
+            receiver,
+            config: *self,
+        })
     }
 }
 
 pub struct MemoryConsumer {
+    receiver: watch::Receiver<tick::Message>,
     config: MemoryConfig,
-    mem: Memory,
 }
 
+#[async_trait]
 impl Consumer for MemoryConsumer {
-    fn handle(&mut self, message: &Message) {
-        if let Message::Tick(msg) = message {
-            self.mem = msg.memory.clone();
-        }
+    async fn consume(&mut self) {
+        self.receiver.changed().await.unwrap();
     }
 
-    fn render(&self) -> Element<Message> {
-        let mem = self.mem.available;
+    fn render(&self, _: &str) -> Element<'_, IcedMessage> {
+        let mem = self.receiver.borrow().memory.available;
         let t = format_bytes(mem);
         let color = self.config.colormap.map(mem as f32);
         text(t).color(color).into()

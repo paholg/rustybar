@@ -1,87 +1,77 @@
-use iced::Color;
-use serde::{Deserialize, Deserializer};
+use std::str::FromStr;
 
-use crate::{
-    consumer::{
-        battery::{self, BatteryColors, BatteryConfig},
-        clock::ClockConfig,
-        cpu::CpuConfig,
-        memory::MemoryConfig,
-        network::NetworkConfig,
-        temp::TempConfig,
-    },
-    ConsumerConfig,
+use iced::Color;
+use serde::Deserialize;
+
+use crate::consumer::{
+    Config,
+    battery::{BatteryColors, BatteryConfig},
+    clock::ClockConfig,
+    cpu::CpuConfig,
+    memory::MemoryConfig,
+    network::NetworkConfig,
+    temp::TempConfig,
+    window_title::WindowTitleConfig,
+    workspace::WorkspaceConfig,
 };
 
 #[derive(Deserialize)]
 #[serde(default)]
 pub struct RustybarConfig {
     pub global: GlobalConfig,
-    pub left: Vec<ConsumerConfig>,
-    pub center: Vec<ConsumerConfig>,
-    pub right: Vec<ConsumerConfig>,
+    pub left: Vec<Box<dyn Config>>,
+    pub center: Vec<Box<dyn Config>>,
+    pub right: Vec<Box<dyn Config>>,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub struct GlobalConfig {
     pub height: u32,
-    #[serde(deserialize_with = "de_color")]
     pub background: Color,
     pub font_size: f32,
     pub spacing: f32,
-}
-
-pub fn de_color<'de, D>(deserializer: D) -> Result<Color, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = <&str>::deserialize(deserializer)?;
-    let Some(value) = Color::parse(s) else {
-        return Err(serde::de::Error::custom("Could not parse as hex color"));
-    };
-
-    Ok(value)
+    #[serde(skip)]
+    pub output: Option<String>,
 }
 
 impl Default for RustybarConfig {
     fn default() -> Self {
         // Spacemacs dark colors
-        let bg1 = Color::parse("#292b2e").unwrap();
-        let bg2 = Color::parse("#1f2022").unwrap();
-        let bg4 = Color::parse("#0a0814").unwrap();
-        let aqua = Color::parse("#2d9574").unwrap();
-        let blue = Color::parse("#4f97d7").unwrap();
-        let magenta = Color::parse("#a31db1").unwrap();
-        let red = Color::parse("#f2241f").unwrap();
+        let bg1 = Color::from_str("#292b2e").unwrap();
+        let bg2 = Color::from_str("#1f2022").unwrap();
+        let _bg4 = Color::from_str("#0a0814").unwrap();
+        let aqua = Color::from_str("#2d9574").unwrap();
+        let blue = Color::from_str("#4f97d7").unwrap();
+        let magenta = Color::from_str("#a31db1").unwrap();
+        let red = Color::from_str("#f2241f").unwrap();
 
         Self {
             global: GlobalConfig {
-                height: 24,
-                background: Color::parse("#000000").unwrap(),
-                font_size: 16.0,
+                height: 28,
+                background: Color::from_str("#000000").unwrap(),
+                font_size: 18.0,
                 spacing: 12.0,
+                output: None,
             },
             left: vec![
-                ClockConfig {
-                    format: "%a %Y-%m-%d".into(),
-                    color: Color::parse("#4f97d7").unwrap(),
-                }
-                .into(),
-                ClockConfig {
-                    format: "%H:%M:%S".into(),
-                    color: Color::parse("#2d9574").unwrap(),
-                }
-                .into(),
+                Box::new(WorkspaceConfig {
+                    focused_color: aqua,
+                    active_color: blue,
+                    inactive_color: Color::from_str("#aaaaaa").unwrap(),
+                    windowless_color: Color::from_str("#666666").unwrap(),
+                    urgent_background: red,
+                    spacing: 12.0,
+                }),
+                Box::new(WindowTitleConfig { color: blue }),
             ],
             center: vec![
-                TempConfig {
+                Box::new(TempConfig {
                     colormap: [(40.0, aqua), (60.0, blue), (80.0, magenta), (100.0, red)]
                         .iter()
                         .collect(),
-                }
-                .into(),
-                CpuConfig {
+                }),
+                Box::new(CpuConfig {
                     min_max_width: 40.0,
                     avg_width: 80.0,
                     spacing: 10.0,
@@ -95,17 +85,15 @@ impl Default for RustybarConfig {
                     ]
                     .iter()
                     .collect(),
-                }
-                .into(),
-                MemoryConfig {
+                }),
+                Box::new(MemoryConfig {
                     colormap: [(1e9, red), (3e9, magenta), (6e9, blue), (8e9, aqua)]
                         .iter()
                         .collect(),
-                }
-                .into(),
+                }),
             ],
             right: vec![
-                NetworkConfig {
+                Box::new(NetworkConfig {
                     colormap: [
                         (0.0, bg2),
                         (1e3, bg1),
@@ -117,9 +105,8 @@ impl Default for RustybarConfig {
                     .iter()
                     .collect(),
                     spacing: 20.0,
-                }
-                .into(),
-                BatteryConfig {
+                }),
+                Box::new(BatteryConfig {
                     width: 40.0,
                     height: 16.0,
                     spacing: 12.0,
@@ -131,18 +118,15 @@ impl Default for RustybarConfig {
                     colormap: [(0.0, red), (0.3, magenta), (0.7, blue), (1.0, aqua)]
                         .iter()
                         .collect(),
-                }
-                .into(),
-                ClockConfig {
+                }),
+                Box::new(ClockConfig {
                     format: "%a %Y-%m-%d".into(),
-                    color: Color::parse("#4f97d7").unwrap(),
-                }
-                .into(),
-                ClockConfig {
+                    color: Color::from_str("#4f97d7").unwrap(),
+                }),
+                Box::new(ClockConfig {
                     format: "%H:%M:%S".into(),
-                    color: Color::parse("#2d9574").unwrap(),
-                }
-                .into(),
+                    color: Color::from_str("#2d9574").unwrap(),
+                }),
             ],
         }
     }

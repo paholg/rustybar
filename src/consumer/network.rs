@@ -1,60 +1,60 @@
+use async_trait::async_trait;
 use iced::{
-    alignment::Vertical,
-    widget::{row, text, Text},
     Element,
+    alignment::Vertical,
+    widget::{Text, row, text},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::{
-    producer::{
-        tick::{Network, TickProducer},
-        ProducerMap,
-    },
+    consumer::{Config, IcedMessage},
+    producer::tick::{self},
     util::{bytes::format_bytes, color::Colormap},
-    ConsumerEnum, Message, ProducerEnum,
 };
 
-use super::{Consumer, RegisterConsumer};
+use super::Consumer;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct NetworkConfig {
     pub colormap: Colormap,
     pub spacing: f32,
 }
 
-impl RegisterConsumer for NetworkConfig {
-    fn register(self, producers: &mut ProducerMap) -> ConsumerEnum {
-        producers.register(ProducerEnum::TickProducer(TickProducer::default()));
-        NetworkConsumer {
-            config: self,
-            network: Network::default(),
-        }
-        .into()
+#[typetag::serde]
+impl Config for NetworkConfig {
+    fn into_consumer(self: Box<Self>) -> Box<dyn Consumer> {
+        let receiver = tick::listen();
+
+        Box::new(NetworkConsumer {
+            receiver,
+            config: *self,
+        })
     }
 }
 
 pub struct NetworkConsumer {
+    receiver: watch::Receiver<tick::Message>,
     config: NetworkConfig,
-    network: Network,
 }
 
 impl NetworkConsumer {
-    fn text(&self, value: u64) -> Text {
+    fn text(&self, value: u64) -> Text<'_> {
         text(format_bytes(value)).color(self.config.colormap.map(value as f32))
     }
 }
 
+#[async_trait]
 impl Consumer for NetworkConsumer {
-    fn handle(&mut self, message: &Message) {
-        if let Message::Tick(msg) = message {
-            self.network = msg.network.clone();
-        }
+    async fn consume(&mut self) {
+        self.receiver.changed().await.unwrap();
     }
 
-    fn render(&self) -> Element<Message> {
+    fn render(&self, _: &str) -> Element<'_, IcedMessage> {
+        let network = &self.receiver.borrow().network;
         row![
-            self.text(self.network.bytes_received),
-            self.text(self.network.bytes_transmitted),
+            self.text(network.bytes_received),
+            self.text(network.bytes_transmitted),
         ]
         .align_y(Vertical::Center)
         .spacing(self.config.spacing)

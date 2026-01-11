@@ -1,24 +1,22 @@
+use async_trait::async_trait;
 use iced::{
+    Color, Element, Length, Theme,
     alignment::Vertical,
     border::Radius,
-    widget::{row, text, ProgressBar},
-    Color, Element, Length, Theme,
+    widget::{ProgressBar, row, text},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::{
-    config::de_color,
-    producer::{
-        tick::{Battery, TickProducer},
-        ProducerMap,
-    },
+    consumer::{Config, IcedMessage},
+    producer::tick::{self},
     util::color::Colormap,
-    ConsumerEnum, Message, ProducerEnum,
 };
 
-use super::{Consumer, RegisterConsumer};
+use super::Consumer;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct BatteryConfig {
     pub width: f32,
     pub height: f32,
@@ -27,38 +25,36 @@ pub struct BatteryConfig {
     pub colors: BatteryColors,
 }
 
-#[derive(Deserialize)]
-pub struct BatteryColors {
-    #[serde(deserialize_with = "de_color")]
-    pub charge: Color,
-    #[serde(deserialize_with = "de_color")]
-    pub discharge: Color,
-    #[serde(deserialize_with = "de_color")]
-    pub unknown: Color,
-}
+#[typetag::serde]
+impl Config for BatteryConfig {
+    fn into_consumer(self: Box<Self>) -> Box<dyn Consumer> {
+        let receiver = tick::listen();
 
-impl RegisterConsumer for BatteryConfig {
-    fn register(self, producers: &mut ProducerMap) -> ConsumerEnum {
-        producers.register(ProducerEnum::TickProducer(TickProducer::default()));
-        BatteryConsumer {
-            config: self,
-            battery: Battery::default(),
-        }
-        .into()
+        Box::new(BatteryConsumer {
+            receiver,
+            config: *self,
+        })
     }
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct BatteryColors {
+    pub charge: Color,
+    pub discharge: Color,
+    pub unknown: Color,
+}
+
 pub struct BatteryConsumer {
+    receiver: watch::Receiver<tick::Message>,
     config: BatteryConfig,
-    battery: Battery,
 }
 
 impl BatteryConsumer {
-    fn bar(&self) -> ProgressBar<'_, Theme> {
-        let color = self.config.colormap.map(self.battery.charge);
-        iced::widget::progress_bar(0.0..=1.0, self.battery.charge)
-            .width(Length::Fixed(self.config.width))
-            .height(Length::Fixed(self.config.height))
+    fn bar(&self, charge: f32) -> ProgressBar<'_, Theme> {
+        let color = self.config.colormap.map(charge);
+        iced::widget::progress_bar(0.0..=1.0, charge)
+            .length(Length::Fixed(self.config.width))
+            .girth(Length::Fixed(self.config.height))
             .style(move |theme: &Theme| iced::widget::progress_bar::Style {
                 bar: color.into(),
                 border: iced::Border {
@@ -71,16 +67,19 @@ impl BatteryConsumer {
     }
 }
 
+#[async_trait]
 impl Consumer for BatteryConsumer {
-    fn handle(&mut self, message: &Message) {
-        if let Message::Tick(msg) = message {
-            self.battery = msg.battery.clone();
-        }
+    async fn consume(&mut self) {
+        self.receiver.changed().await.unwrap();
     }
 
-    fn render(&self) -> Element<Message> {
+    fn render(&self, _: &str) -> Element<'_, IcedMessage> {
+        let Some(battery) = &self.receiver.borrow().battery else {
+            return row![].into();
+        };
+
         let colors = &self.config.colors;
-        let text = match self.battery.state {
+        let text = match battery.state {
             starship_battery::State::Unknown => text('*').color(colors.unknown),
             starship_battery::State::Charging => text('+').color(colors.charge),
             starship_battery::State::Discharging => text('-').color(colors.discharge),
@@ -88,7 +87,7 @@ impl Consumer for BatteryConsumer {
             starship_battery::State::Full => text(' '),
         };
 
-        row![self.bar(), text]
+        row![self.bar(battery.charge), text]
             .align_y(Vertical::Center)
             .spacing(self.config.spacing)
             .into()

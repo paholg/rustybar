@@ -1,23 +1,22 @@
+use async_trait::async_trait;
 use iced::{
+    Element, Length, Theme,
     alignment::Vertical,
     border::Radius,
-    widget::{row, ProgressBar},
-    Element, Length, Theme,
+    widget::{ProgressBar, row},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::{
-    producer::{
-        tick::{Cpu, TickProducer},
-        ProducerMap,
-    },
+    consumer::{Config, IcedMessage},
+    producer::tick::{self},
     util::color::Colormap,
-    ConsumerEnum, Message, ProducerEnum,
 };
 
-use super::{Consumer, RegisterConsumer};
+use super::Consumer;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct CpuConfig {
     pub min_max_width: f32,
     pub avg_width: f32,
@@ -26,28 +25,29 @@ pub struct CpuConfig {
     pub height: f32,
 }
 
-impl RegisterConsumer for CpuConfig {
-    fn register(self, producers: &mut ProducerMap) -> ConsumerEnum {
-        producers.register(ProducerEnum::TickProducer(TickProducer::default()));
-        CpuConsumer {
-            config: self,
-            cpu: Cpu::default(),
-        }
-        .into()
+#[typetag::serde]
+impl Config for CpuConfig {
+    fn into_consumer(self: Box<Self>) -> Box<dyn Consumer> {
+        let receiver = tick::listen();
+
+        Box::new(CpuConsumer {
+            receiver,
+            config: *self,
+        })
     }
 }
 
 pub struct CpuConsumer {
+    receiver: watch::Receiver<tick::Message>,
     config: CpuConfig,
-    cpu: Cpu,
 }
 
 impl CpuConsumer {
     fn bar(&self, value: f32, width: f32) -> ProgressBar<'_, Theme> {
         let color = self.config.colormap.map(value);
         iced::widget::progress_bar(0.0..=1.0, value)
-            .width(Length::Fixed(width))
-            .height(Length::Fixed(self.config.height))
+            .length(Length::Fixed(width))
+            .girth(Length::Fixed(self.config.height))
             .style(move |theme: &Theme| iced::widget::progress_bar::Style {
                 bar: color.into(),
                 border: iced::Border {
@@ -60,18 +60,18 @@ impl CpuConsumer {
     }
 }
 
+#[async_trait]
 impl Consumer for CpuConsumer {
-    fn handle(&mut self, message: &Message) {
-        if let Message::Tick(msg) = message {
-            self.cpu = msg.cpu.clone();
-        }
+    async fn consume(&mut self) {
+        self.receiver.changed().await.unwrap();
     }
 
-    fn render(&self) -> Element<Message> {
+    fn render(&self, _: &str) -> Element<'_, IcedMessage> {
+        let cpu = &self.receiver.borrow().cpu;
         row![
-            self.bar(self.cpu.min, self.config.min_max_width),
-            self.bar(self.cpu.avg, self.config.avg_width),
-            self.bar(self.cpu.max, self.config.min_max_width),
+            self.bar(cpu.min, self.config.min_max_width),
+            self.bar(cpu.avg, self.config.avg_width),
+            self.bar(cpu.max, self.config.min_max_width),
         ]
         .align_y(Vertical::Center)
         .spacing(self.config.spacing)
