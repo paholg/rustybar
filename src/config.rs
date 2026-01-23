@@ -11,6 +11,7 @@ use crate::consumer::{
     memory::MemoryConfig,
     network::NetworkConfig,
     temp::TempConfig,
+    window_diagram::WindowDiagramConfig,
     window_title::WindowTitleConfig,
     workspace::WorkspaceConfig,
 };
@@ -93,6 +94,13 @@ impl Default for RustybarConfig {
                 }),
             ],
             right: vec![
+                Box::new(WindowDiagramConfig {
+                    border: Color::from_str("#aaaaaa").unwrap(),
+                    focused: aqua,
+                    active: blue,
+                    urgent: red,
+                    visible: Color::from_str("#666666").unwrap(),
+                }),
                 Box::new(NetworkConfig {
                     colormap: [
                         (0.0, bg2),

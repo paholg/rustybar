@@ -8,6 +8,7 @@ pub mod cpu;
 pub mod memory;
 pub mod network;
 pub mod temp;
+pub mod window_diagram;
 pub mod window_title;
 pub mod workspace;
 
