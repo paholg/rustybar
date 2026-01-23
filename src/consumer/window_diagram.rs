@@ -1,4 +1,7 @@
+use std::{fs, path::PathBuf};
+
 use async_trait::async_trait;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use iced::{Color, Element, Length, widget::Svg};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
@@ -78,6 +81,7 @@ impl Windows {
                 Some((col, _row)) => {
                     let window = Window {
                         height: layout.tile_size.1,
+                        app_id: window.app_id.clone(),
                         focused: window.is_focused,
                         urgent: window.is_urgent,
                     };
@@ -124,6 +128,44 @@ fn color_to_svg(c: Color) -> String {
         (c.g * 255.0) as u8,
         (c.b * 255.0) as u8
     )
+}
+
+fn find_icon(app_id: &str) -> Option<PathBuf> {
+    // Common icon locations in order of preference
+    let icon_dirs = [
+        "/run/current-system/sw/share/icons/hicolor/scalable/apps",
+        "/run/current-system/sw/share/icons/hicolor/256x256/apps",
+        "/run/current-system/sw/share/icons/hicolor/128x128/apps",
+        "/run/current-system/sw/share/icons/hicolor/64x64/apps",
+        "/run/current-system/sw/share/icons/hicolor/48x48/apps",
+        "/run/current-system/sw/share/pixmaps",
+    ];
+
+    let extensions = ["svg", "png"];
+
+    for dir in &icon_dirs {
+        for ext in &extensions {
+            let path = PathBuf::from(dir).join(format!("{}.{}", app_id, ext));
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    None
+}
+
+fn load_icon_data_url(path: &PathBuf) -> Option<String> {
+    let data = fs::read(path).ok()?;
+    let ext = path.extension()?.to_str()?;
+
+    let mime = match ext {
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        _ => return None,
+    };
+
+    Some(format!("data:{};base64,{}", mime, BASE64.encode(&data)))
 }
 
 #[async_trait]
@@ -185,9 +227,24 @@ impl Consumer for WindowDiagramConsumer {
                 };
 
                 svg.push_str(&format!(
-                    r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="2"/>"#,
+                    r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="1"/>"#,
                     x, y, w, h, fill, border_color
                 ));
+
+                // Draw icon if found
+                if let Some(app_id) = &win.app_id {
+                    if let Some(icon_path) = find_icon(app_id) {
+                        if let Some(data_url) = load_icon_data_url(&icon_path) {
+                            let icon_size = h.min(w) * 0.8;
+                            let icon_x = x + (w - icon_size) / 2.0;
+                            let icon_y = y + (h - icon_size) / 2.0;
+                            svg.push_str(&format!(
+                                r#"<image x="{}" y="{}" width="{}" height="{}" href="{}"/>"#,
+                                icon_x, icon_y, icon_size, icon_size, data_url
+                            ));
+                        }
+                    }
+                }
 
                 y += h;
             }
