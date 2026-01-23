@@ -64,6 +64,13 @@ impl Default for RustybarConfig {
                     urgent_color: red,
                     spacing: 12.0,
                 }),
+                Box::new(WindowDiagramConfig {
+                    border: Color::from_str("#aaaaaa").unwrap(),
+                    focused: blue,
+                    background: Color::BLACK,
+                    urgent: red,
+                    visible: Color::from_str("#666666").unwrap(),
+                }),
                 Box::new(WindowTitleConfig { color: blue }),
             ],
             center: vec![
@@ -94,13 +101,6 @@ impl Default for RustybarConfig {
                 }),
             ],
             right: vec![
-                Box::new(WindowDiagramConfig {
-                    border: Color::from_str("#aaaaaa").unwrap(),
-                    focused: blue,
-                    background: Color::BLACK,
-                    urgent: red,
-                    visible: Color::from_str("#666666").unwrap(),
-                }),
                 Box::new(NetworkConfig {
                     colormap: [
                         (0.0, bg2),
