@@ -17,7 +17,7 @@ pub struct WorkspaceConfig {
     pub active_color: Color,
     pub inactive_color: Color,
     pub windowless_color: Color,
-    pub urgent_background: Color,
+    pub urgent_color: Color,
     pub spacing: f32,
 }
 
@@ -51,13 +51,13 @@ impl Consumer for WorkspaceConsumer {
         };
 
         Row::with_children(output.workspaces.iter().map(|ws| {
-            let fg = if ws.active_window_id.is_some() {
+            let fg = if ws.is_urgent {
+                self.config.urgent_color
+            } else if ws.active_window_id.is_some() {
                 self.config.inactive_color
             } else {
                 self.config.windowless_color
             };
-
-            // FIXME: Handle bg color for urgency.
 
             let label = ws
                 .name

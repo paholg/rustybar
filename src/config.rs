@@ -60,7 +60,7 @@ impl Default for RustybarConfig {
                     active_color: blue,
                     inactive_color: Color::from_str("#aaaaaa").unwrap(),
                     windowless_color: Color::from_str("#666666").unwrap(),
-                    urgent_background: red,
+                    urgent_color: red,
                     spacing: 12.0,
                 }),
                 Box::new(WindowTitleConfig { color: blue }),
