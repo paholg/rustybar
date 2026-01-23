@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use niri_ipc::{
-    Request, Workspace,
+    Request, Window, Workspace,
     socket::Socket,
     state::{EventStreamState, EventStreamStatePart},
 };
@@ -16,6 +16,7 @@ pub struct Message {
 pub struct Output {
     pub workspaces: Vec<Workspace>,
     pub window: String,
+    pub workspace_windows: Vec<Window>,
 }
 
 fn produce(state: &EventStreamState) -> Message {
@@ -26,7 +27,9 @@ fn produce(state: &EventStreamState) -> Message {
             continue;
         };
 
-        let output = outputs.entry(output_name).or_insert_with(Output::default);
+        let output = outputs
+            .entry(output_name.clone())
+            .or_insert_with(Output::default);
 
         if let Some(id) = ws.active_window_id
             && ws.is_active
@@ -40,6 +43,18 @@ fn produce(state: &EventStreamState) -> Message {
 
     for (_, output) in outputs.iter_mut() {
         output.workspaces.sort_by_key(|ws| ws.idx);
+
+        let active_workspace_id = output.workspaces.iter().find(|ws| ws.is_active).unwrap().id;
+        output.workspace_windows = state
+            .windows
+            .windows
+            .values()
+            .filter(|w| w.workspace_id == Some(active_workspace_id))
+            .cloned()
+            .collect();
+        output
+            .workspace_windows
+            .sort_by_key(|w| w.layout.pos_in_scrolling_layout);
     }
 
     Message { outputs }
@@ -49,6 +64,7 @@ pub fn listen() -> watch::Receiver<Message> {
     static SENDER: LazyLock<watch::Sender<Message>> = LazyLock::new(|| {
         let mut socket = Socket::connect().unwrap();
         let mut state = EventStreamState::default();
+
         let init = produce(&state);
         let (sender, _) = watch::channel(init);
 
