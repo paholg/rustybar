@@ -14,7 +14,7 @@ eyre             = "0.6.12"
 futures          = "0.3.31"
 iced_core        = { version = "0.14.0", features = ["serde"] }
 typetag          = "0.2"
-iced             = { version = "0.14.0", features = ["tokio", "canvas"] }
+iced             = { version = "0.14.0", features = ["tokio", "canvas", "svg"] }
 iced_layershell  = "0.14.2"
 inotify          = "0.11.0"
 jiff             = "0.2.18"
