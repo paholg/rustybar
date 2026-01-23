@@ -131,7 +131,9 @@ fn color_to_svg(c: Color) -> String {
 }
 
 fn find_icon(app_id: &str) -> Option<PathBuf> {
-    // Common icon locations in order of preference
+    let extensions = ["svg", "png"];
+
+    // Standard icon locations
     let icon_dirs = [
         "/run/current-system/sw/share/icons/hicolor/scalable/apps",
         "/run/current-system/sw/share/icons/hicolor/256x256/apps",
@@ -141,13 +143,50 @@ fn find_icon(app_id: &str) -> Option<PathBuf> {
         "/run/current-system/sw/share/pixmaps",
     ];
 
-    let extensions = ["svg", "png"];
-
     for dir in &icon_dirs {
         for ext in &extensions {
             let path = PathBuf::from(dir).join(format!("{}.{}", app_id, ext));
             if path.exists() {
                 return Some(path);
+            }
+        }
+    }
+
+    // On NixOS, try to find icon in the app's nix store path
+    if let Ok(bin_path) = std::process::Command::new("which").arg(app_id).output() {
+        if bin_path.status.success() {
+            let bin_path = String::from_utf8_lossy(&bin_path.stdout).trim().to_string();
+            if let Ok(resolved) = fs::canonicalize(&bin_path) {
+                // Go up to the nix store package root (2 levels up from bin/)
+                if let Some(store_path) = resolved.ancestors().nth(2) {
+                    // Search for icons in share/icons and lib/*/logo
+                    let search_dirs = [
+                        store_path.join("share/icons/hicolor/scalable/apps"),
+                        store_path.join("share/icons/hicolor/256x256/apps"),
+                        store_path.join("share/icons/hicolor/128x128/apps"),
+                        store_path.join("share/icons/hicolor/64x64/apps"),
+                        store_path.join("share/icons/hicolor/48x48/apps"),
+                        store_path.join("share/pixmaps"),
+                    ];
+
+                    for dir in &search_dirs {
+                        for ext in &extensions {
+                            let path = dir.join(format!("{}.{}", app_id, ext));
+                            if path.exists() {
+                                return Some(path);
+                            }
+                        }
+                    }
+
+                    // Also try lib/{app}/logo/{app}.png pattern (used by kitty)
+                    for ext in &extensions {
+                        let path =
+                            store_path.join(format!("lib/{}/logo/{}.{}", app_id, app_id, ext));
+                        if path.exists() {
+                            return Some(path);
+                        }
+                    }
+                }
             }
         }
     }
@@ -227,7 +266,7 @@ impl Consumer for WindowDiagramConsumer {
                 };
 
                 svg.push_str(&format!(
-                    r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="1"/>"#,
+                    r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" stroke="{}" stroke-width="1.5"/>"#,
                     x, y, w, h, fill, border_color
                 ));
 

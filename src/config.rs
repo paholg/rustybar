@@ -50,7 +50,7 @@ impl Default for RustybarConfig {
         Self {
             global: GlobalConfig {
                 height: 28,
-                background: Color::from_str("#000000").unwrap(),
+                background: Color::BLACK,
                 font_size: 18.0,
                 spacing: 12.0,
                 output: None,
@@ -65,7 +65,7 @@ impl Default for RustybarConfig {
                     spacing: 12.0,
                 }),
                 Box::new(WindowDiagramConfig {
-                    border: Color::from_str("#aaaaaa").unwrap(),
+                    border: Color::from_str("#666666").unwrap(),
                     focused: blue,
                     background: Color::BLACK,
                     urgent: red,
