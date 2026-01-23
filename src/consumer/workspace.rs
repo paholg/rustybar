@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use iced::{
-    Color, Element,
-    widget::{Row, text},
+    Alignment, Color, Element, Length,
+    widget::{Row, Stack, container, text},
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
@@ -51,11 +51,7 @@ impl Consumer for WorkspaceConsumer {
         };
 
         Row::with_children(output.workspaces.iter().map(|ws| {
-            let fg = if ws.is_focused {
-                self.config.focused_color
-            } else if ws.is_active {
-                self.config.active_color
-            } else if ws.active_window_id.is_some() {
+            let fg = if ws.active_window_id.is_some() {
                 self.config.inactive_color
             } else {
                 self.config.windowless_color
@@ -68,7 +64,32 @@ impl Consumer for WorkspaceConsumer {
                 .as_deref()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| ws.idx.to_string());
-            text(label).color(fg).into()
+
+            let underline_color = if ws.is_focused {
+                self.config.focused_color
+            } else if ws.is_active {
+                self.config.active_color
+            } else {
+                Color::TRANSPARENT
+            };
+
+            let underline = container(text(""))
+                .height(3)
+                .width(Length::Fill)
+                .style(move |_| container::Style {
+                    background: Some(underline_color.into()),
+                    ..Default::default()
+                });
+
+            Stack::new()
+                .push(text(label).color(fg))
+                .push(
+                    container(underline)
+                        .height(Length::Fill)
+                        .width(Length::Fill)
+                        .align_y(Alignment::End),
+                )
+                .into()
         }))
         .spacing(self.config.spacing)
         .into()
