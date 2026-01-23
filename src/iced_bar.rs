@@ -92,8 +92,7 @@ fn view(instance: &BarInstance) -> Element<'_, IcedMessage> {
             Row::with_children(APP.center.iter().map(|comp| comp.render(&instance.output)))
                 .spacing(APP.config.spacing)
         )
-        .center_y(Length::Fill)
-        .center_x(Length::Fill),
+        .center_y(Length::Fill),
         container(
             Row::with_children(APP.right.iter().map(|comp| comp.render(&instance.output)))
                 .spacing(APP.config.spacing)

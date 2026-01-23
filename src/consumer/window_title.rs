@@ -1,5 +1,9 @@
 use async_trait::async_trait;
-use iced::{Color, Element, widget::text};
+use iced::{
+    Color, Element,
+    widget::{row, text},
+};
+use iced_core::text::Wrapping;
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
@@ -40,9 +44,12 @@ impl Consumer for WindowTitleConsumer {
 
     fn render(&self, output: &str) -> Element<'_, IcedMessage> {
         let msg = self.receiver.borrow();
-        match msg.outputs.get(output) {
-            Some(output) => text(output.window.clone()).color(self.config.color).into(),
-            None => text("--- MISSING ---").color(self.config.color).into(),
-        }
+        let txt = match msg.outputs.get(output) {
+            Some(output) => output.window.clone(),
+            None => "--- MISSING ---".into(),
+        };
+        row![text(txt).wrapping(Wrapping::None).color(self.config.color)]
+            .clip(true)
+            .into()
     }
 }
