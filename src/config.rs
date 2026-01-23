@@ -96,8 +96,8 @@ impl Default for RustybarConfig {
             right: vec![
                 Box::new(WindowDiagramConfig {
                     border: Color::from_str("#aaaaaa").unwrap(),
-                    focused: aqua,
-                    active: blue,
+                    focused: blue,
+                    background: Color::BLACK,
                     urgent: red,
                     visible: Color::from_str("#666666").unwrap(),
                 }),
