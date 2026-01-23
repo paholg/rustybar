@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use iced::{Color, Element, widget::row};
+use iced::{
+    Border, Color, Element, Length,
+    widget::{Column as IcedColumn, Row, container},
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
@@ -15,7 +18,7 @@ use super::Consumer;
 pub struct WindowDiagramConfig {
     pub border: Color,
     pub focused: Color,
-    pub active: Color,
+    pub background: Color,
     pub urgent: Color,
     pub visible: Color,
 }
@@ -37,49 +40,65 @@ pub struct WindowDiagramConsumer {
     config: WindowDiagramConfig,
 }
 
-struct WindowInfo {
+struct Window {
     height: f64,
     focused: bool,
     urgent: bool,
-    floating: bool,
+}
+
+struct FloatingWindow {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    focused: bool,
+    urgent: bool,
 }
 
 struct Column {
     width: f64,
-    windows: Vec<WindowInfo>,
+    windows: Vec<Window>,
 }
 
 #[derive(Default)]
 struct Windows {
     scale_factor: f64,
     cols: Vec<Column>,
+    floaters: Vec<FloatingWindow>,
 }
 
 impl Windows {
     fn new(output: &Output) -> Self {
-        let Some(last_window) = output.workspace_windows.last() else {
-            return Windows::default();
-        };
-        let mut cols = Vec::with_capacity(last_window.layout.pos_in_scrolling_layout.unwrap().0);
+        let mut cols = Vec::new();
+        let mut floaters = Vec::new();
 
         for window in output.workspace_windows.iter() {
             let layout = &window.layout;
-            let (col, _row) = layout.pos_in_scrolling_layout.unwrap();
+            match layout.pos_in_scrolling_layout {
+                Some((col, _row)) => {
+                    let window = Window {
+                        height: layout.tile_size.1,
+                        focused: window.is_focused,
+                        urgent: window.is_urgent,
+                    };
 
-            let window = WindowInfo {
-                height: layout.tile_size.1,
-                focused: window.is_focused,
-                urgent: window.is_urgent,
-                floating: window.is_urgent,
-            };
-
-            if col > cols.len() {
-                cols.push(Column {
+                    if col > cols.len() {
+                        cols.push(Column {
+                            width: layout.tile_size.0,
+                            windows: vec![window],
+                        })
+                    } else {
+                        cols.last_mut().unwrap().windows.push(window);
+                    }
+                }
+                None => floaters.push(FloatingWindow {
+                    x: layout.window_offset_in_tile.0,
+                    y: layout.window_offset_in_tile.1,
                     width: layout.tile_size.0,
-                    windows: vec![window],
-                })
-            } else {
-                cols.last_mut().unwrap().windows.push(window);
+                    height: layout.tile_size.1,
+                    focused: window.is_focused,
+                    urgent: window.is_urgent,
+                }),
             }
         }
 
@@ -87,10 +106,14 @@ impl Windows {
             .iter()
             .map(|col| col.windows.iter().map(|w| w.height).sum::<f64>())
             .max_by(|a, b| a.total_cmp(b))
-            .unwrap();
+            .unwrap_or_default();
         let scale_factor = output_height / (APP.config.height as f64);
 
-        Windows { scale_factor, cols }
+        Windows {
+            scale_factor,
+            cols,
+            floaters,
+        }
     }
 }
 
@@ -103,10 +126,47 @@ impl Consumer for WindowDiagramConsumer {
     fn render(&self, output_name: &str) -> Element<'_, IcedMessage> {
         let msg = self.receiver.borrow();
         let Some(output) = msg.outputs.get(output_name) else {
-            return row![].into();
+            return Row::new().into();
         };
         let windows = Windows::new(output);
 
-        row![].into()
+        if windows.cols.is_empty() {
+            return Row::new().into();
+        }
+
+        let config = &self.config;
+        let scale = windows.scale_factor;
+
+        Row::with_children(windows.cols.iter().map(|col| {
+            let scaled_width = (col.width / scale) as f32;
+
+            IcedColumn::with_children(col.windows.iter().map(|win| {
+                let fill = if win.urgent {
+                    config.urgent
+                } else if win.focused {
+                    config.focused
+                } else {
+                    config.background
+                };
+
+                let border_color = config.border;
+
+                container(Row::new())
+                    .width(Length::Fixed(scaled_width))
+                    .height(Length::Fixed((win.height / scale) as f32))
+                    .style(move |_| container::Style {
+                        background: Some(fill.into()),
+                        border: Border {
+                            color: border_color,
+                            width: 1.0,
+                            radius: 0.0.into(),
+                        },
+                        ..Default::default()
+                    })
+                    .into()
+            }))
+            .into()
+        }))
+        .into()
     }
 }
