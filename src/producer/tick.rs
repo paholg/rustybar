@@ -130,10 +130,10 @@ impl Producer {
             .networks
             .iter()
             .filter_map(|(name, network)| {
-                if name.starts_with("lo") {
-                    None
-                } else {
+                if std::path::Path::new(&format!("/sys/class/net/{name}/device")).exists() {
                     Some((network.received(), network.transmitted()))
+                } else {
+                    None
                 }
             })
             .fold((0, 0), |sum, (r, t)| (sum.0 + r, sum.1 + t));
