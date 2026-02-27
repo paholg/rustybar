@@ -75,7 +75,12 @@ pub fn listen() -> watch::Receiver<Message> {
             let mut read_event = socket.read_events();
 
             loop {
-                let event = read_event().unwrap();
+                let event = match read_event() {
+                    Ok(event) => event,
+                    // This is likely an unkown event from a newer version of niri.
+                    Err(e) if e.kind() == std::io::ErrorKind::InvalidData => continue,
+                    Err(e) => panic!("{e}"),
+                };
                 state.apply(event);
                 sender.send(produce(&state)).unwrap();
             }
