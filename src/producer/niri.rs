@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::{collections::HashMap, sync::LazyLock, time::Duration};
 
 use niri_ipc::{
     Request, Window, Workspace,
@@ -6,6 +6,8 @@ use niri_ipc::{
     state::{EventStreamState, EventStreamStatePart},
 };
 use tokio::sync::watch;
+
+const RECONNECT_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
 pub struct Message {
@@ -62,31 +64,47 @@ fn produce(state: &EventStreamState) -> Message {
 
 pub fn listen() -> watch::Receiver<Message> {
     static SENDER: LazyLock<watch::Sender<Message>> = LazyLock::new(|| {
-        let mut socket = Socket::connect().unwrap();
-        let mut state = EventStreamState::default();
-
-        let init = produce(&state);
+        let init = produce(&EventStreamState::default());
         let (sender, _) = watch::channel(init);
 
         let s = sender.clone();
 
         tokio::task::spawn_blocking(move || {
-            socket.send(Request::EventStream).unwrap().unwrap();
-            let mut read_event = socket.read_events();
-
             loop {
-                let event = match read_event() {
-                    Ok(event) => event,
-                    // This is likely an unkown event from a newer version of niri.
-                    Err(e) if e.kind() == std::io::ErrorKind::InvalidData => continue,
-                    Err(e) => panic!("{e}"),
-                };
-                state.apply(event);
-                sender.send(produce(&state)).unwrap();
+                if let Err(e) = run_stream(&sender) {
+                    eprintln!("niri: event stream ended, reconnecting: {e}");
+                }
+                std::thread::sleep(RECONNECT_DELAY);
             }
         });
         s
     });
 
     SENDER.subscribe()
+}
+
+/// Connect to niri and pump events into `sender` until the stream errors out.
+fn run_stream(sender: &watch::Sender<Message>) -> eyre::Result<()> {
+    let mut socket = Socket::connect()?;
+    let mut state = EventStreamState::default();
+
+    socket
+        .send(Request::EventStream)?
+        .map_err(|e| eyre::eyre!("niri rejected EventStream request: {e}"))?;
+    let mut read_event = socket.read_events();
+
+    loop {
+        let event = match read_event() {
+            Ok(event) => event,
+            // This is likely an unkown event from a newer version of niri.
+            Err(e) if e.kind() == std::io::ErrorKind::InvalidData => continue,
+            Err(e) => return Err(e.into()),
+        };
+        state.apply(event);
+        let msg = produce(&state);
+        // All receivers gone means the app is shutting down; stop the stream.
+        if sender.send(msg).is_err() {
+            return Ok(());
+        }
+    }
 }
