@@ -4,7 +4,6 @@ use iced::Color;
 use serde::Deserialize;
 
 use crate::consumer::{
-    Config,
     battery::{BatteryColors, BatteryConfig},
     clock::ClockConfig,
     cpu::CpuConfig,
@@ -14,6 +13,7 @@ use crate::consumer::{
     window_diagram::WindowDiagramConfig,
     window_title::WindowTitleConfig,
     workspace::WorkspaceConfig,
+    Config,
 };
 
 #[derive(Deserialize)]
@@ -63,6 +63,7 @@ impl Default for RustybarConfig {
                     windowless_color: Color::from_str("#666666").unwrap(),
                     urgent_color: Color::from_str("#ffbf00").unwrap(),
                     spacing: 12.0,
+                    max_width: 0.5,
                 }),
                 Box::new(WindowDiagramConfig {
                     border: Color::from_str("#666666").unwrap(),

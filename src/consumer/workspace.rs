@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use iced::{
     Alignment, Color, Element, Length,
-    widget::{Row, Stack, container, text},
+    widget::{Stack, container, text},
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
@@ -9,6 +9,7 @@ use tokio::sync::watch;
 use crate::{
     consumer::{Config, Consumer, IcedMessage},
     producer::niri,
+    util::overflow_row::OverflowRow,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -19,6 +20,15 @@ pub struct WorkspaceConfig {
     pub windowless_color: Color,
     pub urgent_color: Color,
     pub spacing: f32,
+    /// Max width as a fraction of the bar region's available width
+    /// (1.0 = the full region). When exceeded, the workspace list is clipped
+    /// and scrolled to keep the active workspace centered.
+    #[serde(default = "default_max_width")]
+    pub max_width: f32,
+}
+
+fn default_max_width() -> f32 {
+    1.0
 }
 
 #[typetag::serde]
@@ -50,7 +60,18 @@ impl Consumer for WorkspaceConsumer {
             return text("------ MISSSING -----").into();
         };
 
-        Row::with_children(output.workspaces.iter().map(|ws| {
+        let active = output.workspaces.iter().position(|ws| ws.is_active);
+        let urgent = output
+            .workspaces
+            .iter()
+            .enumerate()
+            .filter(|(_, ws)| ws.is_urgent)
+            .map(|(i, _)| i)
+            .collect();
+        let separator =
+            || text("…").color(self.config.windowless_color).into();
+
+        let workspaces = output.workspaces.iter().map(|ws| {
             let fg = if ws.is_urgent {
                 self.config.urgent_color
             } else if ws.active_window_id.is_some() {
@@ -90,8 +111,16 @@ impl Consumer for WorkspaceConsumer {
                         .align_y(Alignment::End),
                 )
                 .into()
-        }))
-        .spacing(self.config.spacing)
+        });
+
+        OverflowRow::new(
+            workspaces,
+            [separator(), separator()],
+            active,
+            urgent,
+            self.config.max_width,
+            self.config.spacing,
+        )
         .into()
     }
 }
