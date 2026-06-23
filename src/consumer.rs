@@ -16,6 +16,7 @@ pub mod workspace;
 #[derive(Debug, Clone)]
 pub enum IcedMessage {
     A,
+    Exit,
 }
 
 #[async_trait]

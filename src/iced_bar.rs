@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 use futures::{SinkExt, Stream};
 use iced::theme::Palette;
 use iced::widget::{Row, container, row};
@@ -5,25 +7,34 @@ use iced::{Element, Font, Length, Subscription, Task, Theme};
 use iced_layershell::application;
 use iced_layershell::reexport::Anchor;
 use iced_layershell::settings::{LayerShellSettings, Settings};
+use tokio::sync::watch;
 
 use crate::APP;
 use crate::consumer::IcedMessage;
 use crate::producer::{niri, tick};
 
-pub fn run(output: String) -> eyre::Result<()> {
+pub fn run(output: String, shutdown: watch::Receiver<bool>) -> eyre::Result<()> {
     // Leak to deal with iced's boot nonsense.
     let o = Box::new(output).leak();
     let start_mode = iced_layershell::settings::StartMode::TargetScreen(o.to_owned());
 
     application(
-        || BarInstance {
+        move || BarInstance {
             output: o.to_owned(),
+            shutdown: shutdown.clone(),
         },
         namespace,
         update,
         view,
     )
     .theme(theme)
+    // Set the style directly: iced_layershell computes the initial style from
+    // the *default* (light) theme and only applies our theme after the first
+    // message, which flashes the bar white on every surface creation.
+    .style(|_, theme| iced::theme::Style {
+        background_color: APP.config.background,
+        text_color: theme.palette().text,
+    })
     .subscription(subscription)
     .settings(Settings {
         id: Some("rustybar".into()),
@@ -46,14 +57,18 @@ pub fn run(output: String) -> eyre::Result<()> {
 
 struct BarInstance {
     output: String,
+    shutdown: watch::Receiver<bool>,
 }
 
 fn namespace() -> String {
     String::from("rustybar")
 }
 
-fn update(_: &mut BarInstance, _: IcedMessage) -> Task<IcedMessage> {
-    Task::none()
+fn update(_: &mut BarInstance, message: IcedMessage) -> Task<IcedMessage> {
+    match message {
+        IcedMessage::Exit => iced::exit(),
+        _ => Task::none(),
+    }
 }
 
 fn theme(_: &BarInstance) -> Theme {
@@ -62,18 +77,44 @@ fn theme(_: &BarInstance) -> Theme {
     Theme::custom("rustybar", palette)
 }
 
-fn subscription(_: &BarInstance) -> Subscription<IcedMessage> {
-    Subscription::run(worker)
+fn subscription(instance: &BarInstance) -> Subscription<IcedMessage> {
+    Subscription::run_with(
+        WorkerSeed {
+            output: instance.output.clone(),
+            shutdown: instance.shutdown.clone(),
+        },
+        worker,
+    )
 }
 
-fn worker() -> impl Stream<Item = IcedMessage> {
-    iced::stream::channel(1, async |mut output| {
+/// Carries the shutdown receiver into the worker subscription. Identified by
+/// output name only, since the receiver isn't `Hash`.
+struct WorkerSeed {
+    output: String,
+    shutdown: watch::Receiver<bool>,
+}
+
+impl Hash for WorkerSeed {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.output.hash(state);
+    }
+}
+
+fn worker(seed: &WorkerSeed) -> impl Stream<Item = IcedMessage> + use<> {
+    let mut shutdown = seed.shutdown.clone();
+    iced::stream::channel(1, async move |mut output| {
         let mut tick_receiver = tick::listen();
         let mut niri_receiver = niri::listen();
         loop {
+            let stop = *shutdown.borrow_and_update();
+            if stop {
+                output.send(IcedMessage::Exit).await.unwrap();
+                return;
+            }
             tokio::select! {
                 _ = tick_receiver.changed() => {},
                 _ = niri_receiver.changed() => {},
+                _ = shutdown.changed() => continue,
             }
             output.send(IcedMessage::A).await.unwrap();
         }
