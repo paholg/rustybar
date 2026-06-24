@@ -4,6 +4,7 @@ use iced::Color;
 use serde::Deserialize;
 
 use crate::consumer::{
+    Config,
     battery::{BatteryColors, BatteryConfig},
     clock::ClockConfig,
     cpu::CpuConfig,
@@ -13,7 +14,6 @@ use crate::consumer::{
     window_diagram::WindowDiagramConfig,
     window_title::WindowTitleConfig,
     workspace::WorkspaceConfig,
-    Config,
 };
 
 #[derive(Deserialize)]

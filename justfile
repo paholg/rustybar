@@ -2,7 +2,7 @@ run:
     direnv exec / nix run .
 
 # Generate code and run lints and tests
-test-local: lint test
+check: lint test
 
 # Update dependencies
 up:

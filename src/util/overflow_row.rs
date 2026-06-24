@@ -176,8 +176,7 @@ where
         let widths: Vec<f32> = nodes.iter().map(|node| node.size().width).collect();
 
         let cap = self.max_fraction * limits.max().width;
-        let total =
-            widths[..n].iter().sum::<f32>() + self.spacing * n.saturating_sub(1) as f32;
+        let total = widths[..n].iter().sum::<f32>() + self.spacing * n.saturating_sub(1) as f32;
 
         let visible: Vec<usize> = if n == 0 {
             Vec::new()
@@ -251,9 +250,9 @@ where
             .zip(&mut tree.children)
             .zip(layout.children())
         {
-            child
-                .as_widget_mut()
-                .update(tree, event, layout, cursor, renderer, clipboard, shell, viewport);
+            child.as_widget_mut().update(
+                tree, event, layout, cursor, renderer, clipboard, shell, viewport,
+            );
         }
     }
 
@@ -324,30 +323,33 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{select, OverflowRow};
+    use super::{OverflowRow, select};
     use iced::advanced::widget::Tree;
-    use iced::widget::{container, text, Stack};
+    use iced::widget::{Stack, container, text};
     use iced::{Element, Length, Size, Theme};
 
     const SPACING: f32 = 12.0;
 
-    /// A child of fixed width `w`; with the null renderer this measures to `w`
-    /// regardless of text, so overflow actually triggers under test.
-    fn box_of(w: f32) -> Element<'static, (), Theme, ()> {
-        container(text("")).width(Length::Fixed(w)).height(Length::Fixed(10.0)).into()
+    /// A child of fixed width `w`; this measures to `w` regardless of text, so
+    /// overflow actually triggers under test.
+    fn box_of(w: f32) -> Element<'static, (), Theme, RecText> {
+        container(text(""))
+            .width(Length::Fixed(w))
+            .height(Length::Fixed(10.0))
+            .into()
     }
 
     /// Mirrors the real workspace child: a fixed-width label with a
     /// `Length::Fill` underline overlaid in a `Stack`. Exercises the path where
     /// a Fill child is measured under the unbounded (infinite-width) limits.
-    fn stack_box(w: f32) -> Element<'static, (), Theme, ()> {
+    fn stack_box(w: f32) -> Element<'static, (), Theme, RecText> {
         Stack::new()
-            .push(container(text("")).width(Length::Fixed(w)).height(Length::Fixed(10.0)))
             .push(
                 container(text(""))
-                    .width(Length::Fill)
-                    .height(Length::Fill),
+                    .width(Length::Fixed(w))
+                    .height(Length::Fixed(10.0)),
             )
+            .push(container(text("")).width(Length::Fill).height(Length::Fill))
             .into()
     }
 
@@ -355,7 +357,7 @@ mod tests {
     /// index, its on-screen x (or `None` if parked off-screen). Index `n` and
     /// `n + 1` are the separators.
     fn layout_positions(
-        make: fn(f32) -> Element<'static, (), Theme, ()>,
+        make: fn(f32) -> Element<'static, (), Theme, RecText>,
         child_widths: &[f32],
         sep_widths: [f32; 2],
         focus: Option<usize>,
@@ -365,17 +367,15 @@ mod tests {
     ) -> Vec<Option<f32>> {
         use iced::advanced::layout::Limits;
 
-        let children: Vec<Element<'static, (), Theme, ()>> =
+        let children: Vec<Element<'static, (), Theme, RecText>> =
             child_widths.iter().map(|&w| make(w)).collect();
         let separators = [box_of(sep_widths[0]), box_of(sep_widths[1])];
         let row = OverflowRow::new(children, separators, focus, pinned, max_fraction, SPACING);
 
-        let mut element: Element<'static, (), Theme, ()> = row.into();
+        let mut element: Element<'static, (), Theme, RecText> = row.into();
         let mut tree = Tree::new(&element);
         let limits = Limits::new(Size::ZERO, Size::new(avail_width, 100.0));
-        let node = element
-            .as_widget_mut()
-            .layout(&mut tree, &(), &limits);
+        let node = element.as_widget_mut().layout(&mut tree, &RecText::default(), &limits);
 
         let w = node.size().width;
         node.children()
@@ -390,7 +390,7 @@ mod tests {
 
     /// Lay out the real widget under overflow and assert it places each chosen
     /// child exactly once, at a distinct x — i.e. nothing is drawn twice.
-    fn assert_each_child_once(make: fn(f32) -> Element<'static, (), Theme, ()>) {
+    fn assert_each_child_once(make: fn(f32) -> Element<'static, (), Theme, RecText>) {
         let child_widths = [52.0, 52.0, 64.0]; // devc, main, pread
         let sep = [12.0, 12.0];
         let n = child_widths.len();
@@ -432,8 +432,7 @@ mod tests {
                 assert_eq!(got, want, "focus={focus} avail={avail}: shown set mismatch");
 
                 // every on-screen child sits at a unique x (no overlap / double-draw)
-                let mut xs: Vec<f32> =
-                    on_screen.iter().map(|&i| positions[i].unwrap()).collect();
+                let mut xs: Vec<f32> = on_screen.iter().map(|&i| positions[i].unwrap()).collect();
                 xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 for pair in xs.windows(2) {
                     assert!(pair[1] > pair[0], "two children share an x: {xs:?}");
@@ -471,12 +470,7 @@ mod tests {
 
     /// Asserts the universal invariants `select` must uphold, returning the
     /// real (workspace) indices in display order for further checks.
-    fn check_invariants(
-        n: usize,
-        focus: usize,
-        pinned: &[usize],
-        order: &[usize],
-    ) -> Vec<usize> {
+    fn check_invariants(n: usize, focus: usize, pinned: &[usize], order: &[usize]) -> Vec<usize> {
         let ctx = format!("n={n} focus={focus} pinned={pinned:?} order={order:?}");
 
         // Every index is a valid child or separator slot.
@@ -518,10 +512,14 @@ mod tests {
     fn invariants_hold_exhaustively() {
         let sep = 8.0;
         let width_profiles: &[fn(usize) -> Vec<f32>] = &[
-            |n| vec![20.0; n],                                   // uniform
-            |n| (0..n).map(|i| 10.0 + 10.0 * i as f32).collect(), // increasing
+            |n| vec![20.0; n],                                          // uniform
+            |n| (0..n).map(|i| 10.0 + 10.0 * i as f32).collect(),       // increasing
             |n| (0..n).map(|i| 10.0 + 10.0 * (n - i) as f32).collect(), // decreasing
-            |n| (0..n).map(|i| if i % 2 == 0 { 12.0 } else { 40.0 }).collect(), // alternating
+            |n| {
+                (0..n)
+                    .map(|i| if i % 2 == 0 { 12.0 } else { 40.0 })
+                    .collect()
+            }, // alternating
         ];
 
         for n in 1..=8usize {
@@ -577,7 +575,10 @@ mod tests {
                         assert!(lo > 0, "left ellipsis but nothing hidden left: {order:?}");
                     }
                     if order.last() == Some(&(n + 1)) {
-                        assert!(hi + 1 < n, "right ellipsis but nothing hidden right: {order:?}");
+                        assert!(
+                            hi + 1 < n,
+                            "right ellipsis but nothing hidden right: {order:?}"
+                        );
                     }
                     cap += 1.0;
                 }
@@ -626,7 +627,7 @@ mod tests {
 
     use iced::advanced::renderer::{self, Quad};
     use iced::advanced::text as adv_text;
-    use iced::advanced::{layout::Limits, mouse, Layout};
+    use iced::advanced::{Layout, layout::Limits, mouse};
     use iced::{Background, Color, Font, Pixels, Point, Rectangle};
     use std::cell::RefCell;
 
@@ -665,8 +666,8 @@ mod tests {
 
     impl adv_text::Renderer for Rec {
         type Font = Font;
-        type Paragraph = ();
-        type Editor = ();
+        type Paragraph = ContentPara;
+        type Editor = NoEditor;
         const ICON_FONT: Font = Font::DEFAULT;
         const CHECKMARK_ICON: char = '0';
         const ARROW_DOWN_ICON: char = '0';
@@ -681,8 +682,8 @@ mod tests {
         fn default_size(&self) -> Pixels {
             Pixels(16.0)
         }
-        fn fill_paragraph(&mut self, _p: &(), _pos: Point, _c: Color, _clip: Rectangle) {}
-        fn fill_editor(&mut self, _e: &(), _pos: Point, _c: Color, _clip: Rectangle) {}
+        fn fill_paragraph(&mut self, _p: &ContentPara, _pos: Point, _c: Color, _clip: Rectangle) {}
+        fn fill_editor(&mut self, _e: &NoEditor, _pos: Point, _c: Color, _clip: Rectangle) {}
         fn fill_text(&mut self, _t: adv_text::Text, _pos: Point, _c: Color, _clip: Rectangle) {}
     }
 
@@ -844,11 +845,11 @@ mod tests {
     impl adv_text::Paragraph for ContentPara {
         type Font = Font;
         fn with_text(text: adv_text::Text<&str, Font>) -> Self {
-            ContentPara { content: text.content.to_string() }
+            ContentPara {
+                content: text.content.to_string(),
+            }
         }
-        fn with_spans<L>(
-            _: adv_text::Text<&[adv_text::Span<'_, L, Font>], Font>,
-        ) -> Self {
+        fn with_spans<L>(_: adv_text::Text<&[adv_text::Span<'_, L, Font>], Font>) -> Self {
             ContentPara::default()
         }
         fn resize(&mut self, _: Size) {}
@@ -896,6 +897,65 @@ mod tests {
         }
     }
 
+    /// A no-op `text::Editor`, needed only to satisfy the renderer's associated
+    /// type. iced's `()` editor is `#[cfg(debug_assertions)]`-only, so we can't
+    /// rely on it in release/nix test builds.
+    #[derive(Default)]
+    struct NoEditor;
+
+    impl adv_text::Editor for NoEditor {
+        type Font = Font;
+        fn with_text(_: &str) -> Self {
+            NoEditor
+        }
+        fn is_empty(&self) -> bool {
+            true
+        }
+        fn cursor(&self) -> adv_text::editor::Cursor {
+            adv_text::editor::Cursor {
+                position: adv_text::editor::Position { line: 0, column: 0 },
+                selection: None,
+            }
+        }
+        fn selection(&self) -> adv_text::editor::Selection {
+            adv_text::editor::Selection::Caret(Point::ORIGIN)
+        }
+        fn copy(&self) -> Option<String> {
+            None
+        }
+        fn line(&self, _: usize) -> Option<adv_text::editor::Line<'_>> {
+            None
+        }
+        fn line_count(&self) -> usize {
+            0
+        }
+        fn perform(&mut self, _: adv_text::editor::Action) {}
+        fn move_to(&mut self, _: adv_text::editor::Cursor) {}
+        fn bounds(&self) -> Size {
+            Size::ZERO
+        }
+        fn min_bounds(&self) -> Size {
+            Size::ZERO
+        }
+        fn update(
+            &mut self,
+            _: Size,
+            _: Font,
+            _: Pixels,
+            _: adv_text::LineHeight,
+            _: adv_text::Wrapping,
+            _: &mut impl adv_text::Highlighter,
+        ) {
+        }
+        fn highlight<H: adv_text::Highlighter>(
+            &mut self,
+            _: Font,
+            _: &mut H,
+            _: impl Fn(&H::Highlight) -> adv_text::highlighter::Format<Font>,
+        ) {
+        }
+    }
+
     #[derive(Default)]
     struct RecText {
         drawn: RefCell<Vec<(String, f32)>>,
@@ -926,7 +986,7 @@ mod tests {
     impl adv_text::Renderer for RecText {
         type Font = Font;
         type Paragraph = ContentPara;
-        type Editor = ();
+        type Editor = NoEditor;
         const ICON_FONT: Font = Font::DEFAULT;
         const CHECKMARK_ICON: char = '0';
         const ARROW_DOWN_ICON: char = '0';
@@ -941,26 +1001,18 @@ mod tests {
         fn default_size(&self) -> Pixels {
             Pixels(16.0)
         }
-        fn fill_paragraph(
-            &mut self,
-            p: &ContentPara,
-            pos: Point,
-            _: Color,
-            _: Rectangle,
-        ) {
+        fn fill_paragraph(&mut self, p: &ContentPara, pos: Point, _: Color, _: Rectangle) {
             self.drawn.borrow_mut().push((p.content.clone(), pos.x));
         }
-        fn fill_editor(&mut self, _: &(), _: Point, _: Color, _: Rectangle) {}
+        fn fill_editor(&mut self, _: &NoEditor, _: Point, _: Color, _: Rectangle) {}
         fn fill_text(&mut self, _: adv_text::Text, _: Point, _: Color, _: Rectangle) {}
     }
 
     /// Builds the bar for `labels` (focus index `focus`) and returns the label
     /// strings actually painted, left to right.
     fn drawn_labels(labels: &[&str], focus: usize, avail: f32) -> Vec<String> {
-        let children: Vec<Element<'static, (), Theme, RecText>> = labels
-            .iter()
-            .map(|&l| text(l.to_string()).into())
-            .collect();
+        let children: Vec<Element<'static, (), Theme, RecText>> =
+            labels.iter().map(|&l| text(l.to_string()).into()).collect();
         let separators = [text("…").into(), text("…").into()];
         let mut element: Element<'static, (), Theme, RecText> =
             OverflowRow::new(children, separators, Some(focus), vec![], 1.0, SPACING).into();
@@ -974,7 +1026,9 @@ mod tests {
         let layout = Layout::new(&node);
         let width = node.size().width;
         let viewport = Rectangle::new(Point::ORIGIN, Size::new(avail, 100.0));
-        let style = renderer::Style { text_color: Color::WHITE };
+        let style = renderer::Style {
+            text_color: Color::WHITE,
+        };
         let mut renderer = RecText::default();
         element.as_widget().draw(
             &tree,
@@ -1005,7 +1059,15 @@ mod tests {
     /// no label painted twice.
     #[test]
     fn real_text_labels_are_not_confused_under_overflow() {
-        let labels = ["a", "b", "sftp-table", "sftp-write", "main", "pread", "edit"];
+        let labels = [
+            "a",
+            "b",
+            "sftp-table",
+            "sftp-write",
+            "main",
+            "pread",
+            "edit",
+        ];
         let n = labels.len();
         let mut failures = Vec::new();
 
@@ -1013,8 +1075,11 @@ mod tests {
             for avail in [90.0, 140.0, 200.0, 280.0, 360.0, 440.0, 520.0, 700.0f32] {
                 let painted = drawn_labels(&labels, focus, avail);
                 // workspace labels actually painted (drop the … separators)
-                let reals: Vec<&str> =
-                    painted.iter().map(String::as_str).filter(|s| *s != "…").collect();
+                let reals: Vec<&str> = painted
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|s| *s != "…")
+                    .collect();
 
                 // (1) no workspace label painted twice
                 let mut uniq = reals.clone();
@@ -1044,7 +1109,12 @@ mod tests {
             }
         }
 
-        assert!(failures.is_empty(), "{} failures:\n{}", failures.len(), failures.join("\n"));
+        assert!(
+            failures.is_empty(),
+            "{} failures:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
     }
 
     /// `select` must be a pure function: identical inputs yield identical
@@ -1058,7 +1128,10 @@ mod tests {
                 for cap in [10.0, 33.0, 51.0, 77.0, 95.0, 130.0, 180.0f32] {
                     let a = select(5, focus, &pinned, &w, SPACING, cap);
                     let b = select(5, focus, &pinned, &w, SPACING, cap);
-                    assert_eq!(a, b, "nondeterministic: focus={focus} pinned={pinned:?} cap={cap}");
+                    assert_eq!(
+                        a, b,
+                        "nondeterministic: focus={focus} pinned={pinned:?} cap={cap}"
+                    );
                 }
             }
         }
