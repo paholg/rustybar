@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use iced::{
-    Alignment, Color, Element, Length,
+    Alignment, Color, Element, Length, Padding,
     widget::{Stack, container, text},
 };
 use serde::{Deserialize, Serialize};
@@ -108,7 +108,14 @@ impl Consumer for WorkspaceConsumer {
                     container(underline)
                         .height(Length::Fill)
                         .width(Length::Fill)
-                        .align_y(Alignment::End),
+                        .align_y(Alignment::End)
+                        // Lift the underline 1px off the bottom so its
+                        // anti-aliased fringe stays inside this row's layer
+                        // bounds. iced clamps incremental-repaint damage to the
+                        // layer bounds, so a fringe bleeding past the edge never
+                        // gets cleared and survives as a faint ghost in one of
+                        // the rotating back-buffers.
+                        .padding(Padding::ZERO.bottom(1.0)),
                 )
                 .into()
         });
