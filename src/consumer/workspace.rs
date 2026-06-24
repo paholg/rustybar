@@ -68,6 +68,7 @@ impl Consumer for WorkspaceConsumer {
             .filter(|(_, ws)| ws.is_urgent)
             .map(|(i, _)| i)
             .collect();
+
         let separator =
             || text("…").color(self.config.windowless_color).into();
 
