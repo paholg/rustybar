@@ -30,6 +30,10 @@
           wayland
         ];
 
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+        ];
+
         cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
 
         package = pkgs.rustPlatform.buildRustPackage {
@@ -38,6 +42,7 @@
           meta.mainProgram = cargoToml.package.name;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          inherit buildInputs nativeBuildInputs;
 
           postFixup = ''
             patchelf --add-rpath ${pkgs.lib.makeLibraryPath buildInputs} $out/bin/${cargoToml.package.name}
@@ -47,8 +52,9 @@
       {
         packages.default = package;
         devShells.default = pkgs.mkShell {
-          inherit buildInputs;
+          inherit buildInputs nativeBuildInputs;
           packages = [
+            pkgs.cargo-edit
             pkgs.just
             rustDev
           ];

@@ -375,7 +375,9 @@ mod tests {
         let mut element: Element<'static, (), Theme, RecText> = row.into();
         let mut tree = Tree::new(&element);
         let limits = Limits::new(Size::ZERO, Size::new(avail_width, 100.0));
-        let node = element.as_widget_mut().layout(&mut tree, &RecText::default(), &limits);
+        let node = element
+            .as_widget_mut()
+            .layout(&mut tree, &RecText::default(), &limits);
 
         let w = node.size().width;
         node.children()
