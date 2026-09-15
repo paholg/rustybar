@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use iced::Element;
+use iced::{Element, Point, window};
 use iced_layershell::to_layer_message;
 
 pub mod battery;
@@ -13,12 +13,34 @@ pub mod window_diagram;
 pub mod window_title;
 pub mod workspace;
 
-#[to_layer_message]
+#[to_layer_message(multi)]
 #[derive(Debug, Clone)]
 pub enum IcedMessage {
     A,
     Exit,
-    TrayActivate { address: String, secondary: bool },
+    /// The pointer moved over one of our surfaces.
+    Cursor {
+        window: window::Id,
+        position: Point,
+    },
+    WindowClosed(window::Id),
+    TrayActivate {
+        address: String,
+        secondary: bool,
+    },
+    TrayMenuOpen {
+        address: String,
+    },
+    /// The pointer entered (`Some`) or left (`None`) a tray icon.
+    TrayHover {
+        address: Option<String>,
+    },
+    TrayMenuClick {
+        popup: window::Id,
+        address: String,
+        menu_path: String,
+        item: i32,
+    },
 }
 
 #[async_trait]

@@ -9,6 +9,7 @@ use iced::widget::{image, svg};
 use system_tray::{
     client::{ActivateRequest, Client},
     item::{IconPixmap, Status, StatusNotifierItem},
+    menu::{MenuItem, MenuType, ToggleState, ToggleType},
 };
 use tokio::sync::watch;
 
@@ -28,7 +29,23 @@ pub struct Item {
     /// The item's bus name, used to send it events.
     pub address: String,
     pub id: String,
+    /// Hover text: the tooltip title, falling back to the item title or id.
+    pub title: String,
     pub icon: Icon,
+    /// DBus object path of the item's menu, needed to click entries.
+    pub menu_path: Option<String>,
+    pub menu: Vec<MenuEntry>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MenuEntry {
+    pub id: i32,
+    pub label: String,
+    pub enabled: bool,
+    pub separator: bool,
+    /// `Some` for checkable entries.
+    pub checked: Option<bool>,
+    pub children: Vec<MenuEntry>,
 }
 
 #[derive(Debug, Default)]
@@ -39,24 +56,58 @@ pub struct Message {
 
 static CLIENT: OnceLock<Client> = OnceLock::new();
 
-pub fn listen() -> watch::Receiver<Message> {
-    static SENDER: LazyLock<watch::Sender<Message>> = LazyLock::new(|| {
-        let (sender, _) = watch::channel(Message::default());
+static SENDER: LazyLock<watch::Sender<Message>> = LazyLock::new(|| {
+    let (sender, _) = watch::channel(Message::default());
 
-        let s = sender.clone();
+    let s = sender.clone();
 
-        tokio::spawn(async move {
-            loop {
-                if let Err(e) = run(&sender).await {
-                    eprintln!("tray: client stopped, retrying: {e}");
-                }
-                tokio::time::sleep(RECONNECT_DELAY).await;
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = run(&sender).await {
+                eprintln!("tray: client stopped, retrying: {e}");
             }
-        });
-        s
+            tokio::time::sleep(RECONNECT_DELAY).await;
+        }
     });
+    s
+});
 
+pub fn listen() -> watch::Receiver<Message> {
     SENDER.subscribe()
+}
+
+/// The latest snapshot's entry for `address`, if it still exists.
+pub fn item(address: &str) -> Option<Item> {
+    SENDER
+        .borrow()
+        .items
+        .iter()
+        .find(|item| item.address == address)
+        .cloned()
+}
+
+/// Tell the item its menu is about to be shown, so lazy apps populate it.
+pub async fn menu_about_to_show(address: String, menu_path: String) {
+    let Some(client) = CLIENT.get() else {
+        return;
+    };
+    if let Err(e) = client.about_to_show_menuitem(address, menu_path, 0).await {
+        eprintln!("tray: about_to_show failed: {e}");
+    }
+}
+
+pub async fn menu_click(address: String, menu_path: String, submenu_id: i32) {
+    let Some(client) = CLIENT.get() else {
+        return;
+    };
+    let req = ActivateRequest::MenuItem {
+        address,
+        menu_path,
+        submenu_id,
+    };
+    if let Err(e) = client.activate(req).await {
+        eprintln!("tray: menu click failed: {e}");
+    }
 }
 
 /// Send a click to the item at `address`. Does nothing if the tray client
@@ -115,15 +166,52 @@ fn snapshot(client: &Client, icons: &mut IconCache) -> Message {
         .unwrap()
         .iter()
         .filter(|(_, (item, _))| item.status != Status::Passive)
-        .map(|(address, (item, _))| Item {
+        .map(|(address, (item, menu))| Item {
             address: address.clone(),
             id: item.id.clone(),
+            title: title(item),
             icon: icons.get(address, item),
+            menu_path: item.menu.clone(),
+            menu: menu
+                .as_ref()
+                .map(|menu| menu_entries(&menu.submenus))
+                .unwrap_or_default(),
         })
         .collect();
     icons.retain(&items);
     items.sort_by(|a, b| a.id.cmp(&b.id).then(a.address.cmp(&b.address)));
     Message { items }
+}
+
+fn title(item: &StatusNotifierItem) -> String {
+    item.tool_tip
+        .as_ref()
+        .map(|t| t.title.as_str())
+        .filter(|t| !t.is_empty())
+        .or(item.title.as_deref())
+        .filter(|t| !t.is_empty())
+        .unwrap_or(&item.id)
+        .to_owned()
+}
+
+fn menu_entries(items: &[MenuItem]) -> Vec<MenuEntry> {
+    items
+        .iter()
+        .filter(|item| item.visible)
+        .map(|item| MenuEntry {
+            id: item.id,
+            label: item.label.clone().unwrap_or_default(),
+            enabled: item.enabled,
+            separator: item.menu_type == MenuType::Separator,
+            checked: match item.toggle_type {
+                ToggleType::Checkmark | ToggleType::Radio => {
+                    Some(item.toggle_state == ToggleState::On)
+                }
+                ToggleType::CannotBeToggled => None,
+            },
+            children: menu_entries(&item.submenu),
+        })
+        .collect()
 }
 
 /// Icon handles keyed by item address. Reusing a handle lets iced keep the
