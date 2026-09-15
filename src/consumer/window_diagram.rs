@@ -1,7 +1,4 @@
-use std::{fs, path::PathBuf};
-
 use async_trait::async_trait;
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use iced::{Color, Element, Length, widget::Svg};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
@@ -10,6 +7,7 @@ use crate::{
     APP,
     consumer::{Config, IcedMessage},
     producer::niri::{self, Output},
+    util::icon::{find_icon, load_icon_data_url},
 };
 
 use super::Consumer;
@@ -130,82 +128,6 @@ fn color_to_svg(c: Color) -> String {
     )
 }
 
-fn find_icon(app_id: &str) -> Option<PathBuf> {
-    let extensions = ["svg", "png"];
-
-    // Standard icon locations
-    let icon_dirs = [
-        "/run/current-system/sw/share/icons/hicolor/scalable/apps",
-        "/run/current-system/sw/share/icons/hicolor/256x256/apps",
-        "/run/current-system/sw/share/icons/hicolor/128x128/apps",
-        "/run/current-system/sw/share/icons/hicolor/64x64/apps",
-        "/run/current-system/sw/share/icons/hicolor/48x48/apps",
-        "/run/current-system/sw/share/pixmaps",
-    ];
-
-    for dir in &icon_dirs {
-        for ext in &extensions {
-            let path = PathBuf::from(dir).join(format!("{}.{}", app_id, ext));
-            if path.exists() {
-                return Some(path);
-            }
-        }
-    }
-
-    // On NixOS, try to find icon in the app's nix store path
-    if let Ok(bin_path) = std::process::Command::new("which").arg(app_id).output()
-        && bin_path.status.success()
-    {
-        let bin_path = String::from_utf8_lossy(&bin_path.stdout).trim().to_string();
-        if let Ok(resolved) = fs::canonicalize(&bin_path) {
-            // Go up to the nix store package root (2 levels up from bin/)
-            if let Some(store_path) = resolved.ancestors().nth(2) {
-                // Search for icons in share/icons and lib/*/logo
-                let search_dirs = [
-                    store_path.join("share/icons/hicolor/scalable/apps"),
-                    store_path.join("share/icons/hicolor/256x256/apps"),
-                    store_path.join("share/icons/hicolor/128x128/apps"),
-                    store_path.join("share/icons/hicolor/64x64/apps"),
-                    store_path.join("share/icons/hicolor/48x48/apps"),
-                    store_path.join("share/pixmaps"),
-                ];
-
-                for dir in &search_dirs {
-                    for ext in &extensions {
-                        let path = dir.join(format!("{}.{}", app_id, ext));
-                        if path.exists() {
-                            return Some(path);
-                        }
-                    }
-                }
-
-                // Also try lib/{app}/logo/{app}.png pattern (used by kitty)
-                for ext in &extensions {
-                    let path = store_path.join(format!("lib/{}/logo/{}.{}", app_id, app_id, ext));
-                    if path.exists() {
-                        return Some(path);
-                    }
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn load_icon_data_url(path: &PathBuf) -> Option<String> {
-    let data = fs::read(path).ok()?;
-    let ext = path.extension()?.to_str()?;
-
-    let mime = match ext {
-        "svg" => "image/svg+xml",
-        "png" => "image/png",
-        _ => return None,
-    };
-
-    Some(format!("data:{};base64,{}", mime, BASE64.encode(&data)))
-}
-
 #[async_trait]
 impl Consumer for WindowDiagramConsumer {
     async fn consume(&mut self) {
@@ -271,7 +193,7 @@ impl Consumer for WindowDiagramConsumer {
 
                 // Draw icon if found
                 if let Some(app_id) = &win.app_id
-                    && let Some(icon_path) = find_icon(app_id)
+                    && let Some(icon_path) = find_icon(app_id, None)
                     && let Some(data_url) = load_icon_data_url(&icon_path)
                 {
                     let icon_size = h.min(w) * 0.8;

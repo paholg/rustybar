@@ -8,6 +8,7 @@ pub mod cpu;
 pub mod memory;
 pub mod network;
 pub mod temp;
+pub mod tray;
 pub mod window_diagram;
 pub mod window_title;
 pub mod workspace;
@@ -17,6 +18,7 @@ pub mod workspace;
 pub enum IcedMessage {
     A,
     Exit,
+    TrayActivate { address: String, secondary: bool },
 }
 
 #[async_trait]

@@ -1,5 +1,6 @@
 pub mod niri;
 pub mod tick;
+pub mod tray;
 
 // pub trait Producer {
 //     fn produce(&mut self) -> BoxFuture<'_, Message>;

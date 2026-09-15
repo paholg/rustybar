@@ -11,7 +11,7 @@ use tokio::sync::watch;
 
 use crate::APP;
 use crate::consumer::IcedMessage;
-use crate::producer::{niri, tick};
+use crate::producer::{niri, tick, tray};
 
 pub fn run(output: String, shutdown: watch::Receiver<bool>) -> eyre::Result<()> {
     // Leak to deal with iced's boot nonsense.
@@ -67,6 +67,9 @@ fn namespace() -> String {
 fn update(_: &mut BarInstance, message: IcedMessage) -> Task<IcedMessage> {
     match message {
         IcedMessage::Exit => iced::exit(),
+        IcedMessage::TrayActivate { address, secondary } => {
+            Task::future(tray::activate(address, secondary)).discard()
+        }
         _ => Task::none(),
     }
 }
@@ -105,6 +108,7 @@ fn worker(seed: &WorkerSeed) -> impl Stream<Item = IcedMessage> + use<> {
     iced::stream::channel(1, async move |mut output| {
         let mut tick_receiver = tick::listen();
         let mut niri_receiver = niri::listen();
+        let mut tray_receiver = tray::listen();
         loop {
             let stop = *shutdown.borrow_and_update();
             if stop {
@@ -114,6 +118,7 @@ fn worker(seed: &WorkerSeed) -> impl Stream<Item = IcedMessage> + use<> {
             tokio::select! {
                 _ = tick_receiver.changed() => {},
                 _ = niri_receiver.changed() => {},
+                _ = tray_receiver.changed() => {},
                 _ = shutdown.changed() => continue,
             }
             output.send(IcedMessage::A).await.unwrap();

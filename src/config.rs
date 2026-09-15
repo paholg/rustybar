@@ -11,6 +11,7 @@ use crate::consumer::{
     memory::MemoryConfig,
     network::NetworkConfig,
     temp::TempConfig,
+    tray::TrayConfig,
     window_diagram::WindowDiagramConfig,
     window_title::WindowTitleConfig,
     workspace::WorkspaceConfig,
@@ -135,6 +136,10 @@ impl Default for RustybarConfig {
                 Box::new(ClockConfig {
                     format: "%H:%M:%S".into(),
                     color: Color::from_str("#2d9574").unwrap(),
+                }),
+                Box::new(TrayConfig {
+                    icon_size: 20.0,
+                    spacing: 8.0,
                 }),
             ],
         }
