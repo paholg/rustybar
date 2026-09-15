@@ -43,7 +43,7 @@ fn produce(state: &EventStreamState) -> Message {
         output.workspaces.push(ws.clone());
     }
 
-    for (_, output) in outputs.iter_mut() {
+    for output in outputs.values_mut() {
         output.workspaces.sort_by_key(|ws| ws.idx);
 
         let active_workspace_id = output.workspaces.iter().find(|ws| ws.is_active).unwrap().id;
