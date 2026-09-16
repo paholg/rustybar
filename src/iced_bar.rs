@@ -7,10 +7,7 @@ use iced::widget::{Row, container, row};
 use iced::{Element, Event, Font, Length, Point, Subscription, Task, Theme, mouse, window};
 use iced_layershell::actions::IcedNewPopupSettings;
 use iced_layershell::build_pattern::daemon;
-use iced_layershell::reexport::{
-    Anchor, KeyboardInteractivity, Layer, NewLayerShellSettings, OutputOption, PopupAnchor,
-    PopupGravity,
-};
+use iced_layershell::reexport::{Anchor, PopupAnchor, PopupGravity};
 use iced_layershell::settings::{LayerShellSettings, Settings};
 use tokio::sync::watch;
 
@@ -73,31 +70,19 @@ struct BarInstance {
 
 enum Popup {
     TrayMenu { address: String },
-    Tooltip { address: String },
-}
-
-impl Popup {
-    fn is_tooltip(&self) -> bool {
-        matches!(self, Popup::Tooltip { .. })
-    }
 }
 
 fn namespace() -> String {
     String::from("rustybar")
 }
 
-/// Close every popup matching `which`.
-fn close_popups(instance: &mut BarInstance, which: fn(&Popup) -> bool) -> Task<IcedMessage> {
-    let ids: Vec<_> = instance
-        .popups
-        .iter()
-        .filter(|(_, popup)| which(popup))
-        .map(|(id, _)| *id)
-        .collect();
-    Task::batch(ids.into_iter().map(|id| {
-        instance.popups.remove(&id);
-        Task::done(IcedMessage::RemoveWindow(id))
-    }))
+fn close_popups(instance: &mut BarInstance) -> Task<IcedMessage> {
+    Task::batch(
+        instance
+            .popups
+            .drain()
+            .map(|(id, _)| Task::done(IcedMessage::RemoveWindow(id))),
+    )
 }
 
 fn update(instance: &mut BarInstance, message: IcedMessage) -> Task<IcedMessage> {
@@ -114,41 +99,8 @@ fn update(instance: &mut BarInstance, message: IcedMessage) -> Task<IcedMessage>
         IcedMessage::TrayActivate { address, secondary } => {
             Task::future(tray::activate(address, secondary)).discard()
         }
-        IcedMessage::TrayHover { address } => {
-            let close = close_popups(instance, Popup::is_tooltip);
-            let Some(item) = address.and_then(|address| tray::item(&address)) else {
-                return close;
-            };
-            let size = tray_consumer::tooltip_size(&item);
-            let x = instance.cursor.map(|(_, p)| p.x as i32).unwrap_or(0);
-            let left = (x - size.0 as i32 / 2).max(0);
-            let id = window::Id::unique();
-            instance.popups.insert(
-                id,
-                Popup::Tooltip {
-                    address: item.address,
-                },
-            );
-            // A popup would take a pointer grab, so use a layer surface just
-            // below the bar, centered on the pointer, that ignores input.
-            let settings = NewLayerShellSettings {
-                size: Some(size),
-                layer: Layer::Overlay,
-                anchor: Anchor::Top | Anchor::Left,
-                exclusive_zone: Some(0),
-                margin: Some((APP.config.height as i32, 0, 0, left)),
-                keyboard_interactivity: KeyboardInteractivity::None,
-                output_option: OutputOption::OutputName(instance.output.clone()),
-                events_transparent: true,
-                namespace: Some("rustybar-tooltip".into()),
-            };
-            Task::batch([
-                close,
-                Task::done(IcedMessage::NewLayerShell { settings, id }),
-            ])
-        }
         IcedMessage::TrayMenuOpen { address } => {
-            let close = close_popups(instance, |_| true);
+            let close = close_popups(instance);
             let Some(item) = tray::item(&address) else {
                 return close;
             };
@@ -257,10 +209,6 @@ fn view(instance: &BarInstance, id: window::Id) -> Element<'_, IcedMessage> {
     match instance.popups.get(&id) {
         Some(Popup::TrayMenu { address }) => match tray::item(address) {
             Some(item) => tray_consumer::menu_view(id, &item),
-            None => iced::widget::Space::new().into(),
-        },
-        Some(Popup::Tooltip { address }) => match tray::item(address) {
-            Some(item) => tray_consumer::tooltip_view(&item),
             None => iced::widget::Space::new().into(),
         },
         None => bar_view(instance),

@@ -55,6 +55,7 @@ pub struct Message {
 }
 
 static CLIENT: OnceLock<Client> = OnceLock::new();
+static CONNECTION: OnceLock<zbus::Connection> = OnceLock::new();
 
 static SENDER: LazyLock<watch::Sender<Message>> = LazyLock::new(|| {
     let (sender, _) = watch::channel(Message::default());
@@ -113,26 +114,49 @@ pub async fn menu_click(address: String, menu_path: String, submenu_id: i32) {
 /// Send a click to the item at `address`. Does nothing if the tray client
 /// hasn't connected yet.
 pub async fn activate(address: String, secondary: bool) {
-    let Some(client) = CLIENT.get() else {
-        return;
-    };
-    // The coordinates are only a hint for where the item may open a window.
-    let req = if secondary {
-        ActivateRequest::Secondary {
-            address,
-            x: 0,
-            y: 0,
-        }
-    } else {
-        ActivateRequest::Default {
-            address,
-            x: 0,
-            y: 0,
-        }
-    };
-    if let Err(e) = client.activate(req).await {
+    if let Err(e) = try_activate(&address, secondary).await {
         eprintln!("tray: activate failed: {e}");
     }
+}
+
+/// The `system_tray` crate sends `Activate` to `/StatusNotifierItem`, but
+/// many apps register a different object path, so call it ourselves using
+/// the path the watcher recorded.
+async fn try_activate(address: &str, secondary: bool) -> eyre::Result<()> {
+    let connection = CONNECTION
+        .get()
+        .ok_or_else(|| eyre::eyre!("not connected"))?;
+    let watcher = zbus::Proxy::new(
+        connection,
+        "org.kde.StatusNotifierWatcher",
+        "/StatusNotifierWatcher",
+        "org.kde.StatusNotifierWatcher",
+    )
+    .await?;
+    // Entries are `<bus name><object path>`, e.g. `:1.5/org/blueman/sni`.
+    let items: Vec<String> = watcher
+        .get_property("RegisteredStatusNotifierItems")
+        .await?;
+    let path = items
+        .iter()
+        .find_map(|item| item.strip_prefix(address).filter(|p| p.starts_with('/')))
+        .ok_or_else(|| eyre::eyre!("no registered item at {address}"))?;
+
+    let item = zbus::Proxy::new(
+        connection,
+        address.to_owned(),
+        path.to_owned(),
+        "org.kde.StatusNotifierItem",
+    )
+    .await?;
+    let method = if secondary {
+        "SecondaryActivate"
+    } else {
+        "Activate"
+    };
+    // The coordinates are only a hint for where the item may open a window.
+    item.call_method(method, &(0i32, 0i32)).await?;
+    Ok(())
 }
 
 async fn client() -> eyre::Result<&'static Client> {
@@ -140,6 +164,8 @@ async fn client() -> eyre::Result<&'static Client> {
         return Ok(client);
     }
     let client = Client::new().await?;
+    let connection = zbus::Connection::session().await?;
+    CONNECTION.get_or_init(|| connection);
     Ok(CLIENT.get_or_init(|| client))
 }
 

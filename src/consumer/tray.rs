@@ -65,10 +65,6 @@ impl TrayConsumer {
             .on_right_press(IcedMessage::TrayMenuOpen {
                 address: item.address.clone(),
             })
-            .on_enter(IcedMessage::TrayHover {
-                address: Some(item.address.clone()),
-            })
-            .on_exit(IcedMessage::TrayHover { address: None })
             .into()
     }
 }
@@ -85,36 +81,6 @@ impl Consumer for TrayConsumer {
             .spacing(self.config.spacing)
             .into()
     }
-}
-
-// --- Tooltip ---------------------------------------------------------------
-
-const TOOLTIP_PADDING: f32 = 4.0;
-
-/// Surface size for `item`'s tooltip, estimated from the text length.
-pub fn tooltip_size(item: &Item) -> (u32, u32) {
-    let width = item.title.chars().count() as f32 * APP.config.font_size * 0.62;
-    let height = APP.config.font_size * 1.3;
-    (
-        (width + 2.0 * TOOLTIP_PADDING + 8.0) as u32,
-        (height + 2.0 * TOOLTIP_PADDING + 2.0) as u32,
-    )
-}
-
-pub fn tooltip_view(item: &Item) -> Element<'static, IcedMessage> {
-    container(text(item.title.clone()))
-        .padding(TOOLTIP_PADDING)
-        .center(Length::Fill)
-        .style(|theme: &Theme| container::Style {
-            background: Some(Background::Color(APP.config.background)),
-            border: Border {
-                color: theme.palette().text.scale_alpha(0.5),
-                width: 1.0,
-                radius: 0.0.into(),
-            },
-            ..container::Style::default()
-        })
-        .into()
 }
 
 // --- Popup menu ------------------------------------------------------------

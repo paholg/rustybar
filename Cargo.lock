@@ -4058,6 +4058,7 @@ dependencies = [
  "system-tray",
  "tokio",
  "typetag",
+ "zbus",
 ]
 
 [[package]]

@@ -31,10 +31,6 @@ pub enum IcedMessage {
     TrayMenuOpen {
         address: String,
     },
-    /// The pointer entered (`Some`) or left (`None`) a tray icon.
-    TrayHover {
-        address: Option<String>,
-    },
     TrayMenuClick {
         popup: window::Id,
         address: String,
