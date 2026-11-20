@@ -46,7 +46,15 @@ fn produce(state: &EventStreamState) -> Message {
     for output in outputs.values_mut() {
         output.workspaces.sort_by_key(|ws| ws.idx);
 
-        let active_workspace_id = output.workspaces.iter().find(|ws| ws.is_active).unwrap().id;
+        // niri can transiently report an output with no active workspace.
+        let Some(active_workspace_id) = output
+            .workspaces
+            .iter()
+            .find(|ws| ws.is_active)
+            .map(|ws| ws.id)
+        else {
+            continue;
+        };
         output.workspace_windows = state
             .windows
             .windows
@@ -71,8 +79,13 @@ pub fn listen() -> watch::Receiver<Message> {
 
         tokio::task::spawn_blocking(move || {
             loop {
-                if let Err(e) = run_stream(&sender) {
-                    eprintln!("niri: event stream ended, reconnecting: {e}");
+                // A panic here would otherwise silently kill this thread and
+                // freeze the bar on its last state, so treat it like an error.
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_stream(&sender)))
+                {
+                    Ok(Ok(())) => return,
+                    Ok(Err(e)) => eprintln!("niri: event stream ended, reconnecting: {e}"),
+                    Err(_) => eprintln!("niri: event stream panicked, reconnecting"),
                 }
                 std::thread::sleep(RECONNECT_DELAY);
             }
@@ -110,7 +123,11 @@ fn run_stream(sender: &watch::Sender<Message>) -> eyre::Result<()> {
             Err(e) if e.kind() == std::io::ErrorKind::InvalidData => continue,
             Err(e) => return Err(e.into()),
         };
-        state.apply(event);
+        // Only track the parts we use. In particular, niri-ipc's CastsState
+        // panics on a CastStopped for an unknown cast.
+        if let Some(event) = state.workspaces.apply(event) {
+            state.windows.apply(event);
+        }
         let msg = produce(&state);
         // All receivers gone means the app is shutting down; stop the stream.
         if sender.send(msg).is_err() {
